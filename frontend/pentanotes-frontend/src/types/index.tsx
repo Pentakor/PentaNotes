@@ -6,6 +6,7 @@ export interface Note {
   updatedAt: string;
   userId?: number;
   folderId?: number;
+  linkedNoteIds?: number[];
 }
 
 export interface Folder {

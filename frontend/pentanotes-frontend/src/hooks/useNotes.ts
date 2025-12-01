@@ -75,5 +75,14 @@ export const useNotes = (token: string | null, folderId?: number | null) => {
     }
   };
 
-  return { notes, loading, createNote, updateNote, deleteNote, refreshNotes: loadNotes };
+  const getAllNotes = async (): Promise<Note[]> => {
+    try {
+      return await apiService.getNotes();
+    } catch (err) {
+      console.error('Failed to get all notes:', err);
+      throw err;
+    }
+  };
+
+  return { notes, loading, createNote, updateNote, deleteNote, refreshNotes: loadNotes, getAllNotes };
 };

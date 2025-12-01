@@ -123,7 +123,8 @@ class ApiService {
 
   async updateNote(id: number, title: string, content: string, folderId?: number | null): Promise<Note> {
     const payload: Record<string, unknown> = { title, content };
-    if (folderId !== undefined) {
+    // Only include folderId if it's a valid number (not null or undefined)
+    if (folderId !== undefined && folderId !== null) {
       payload.folderId = folderId;
     }
 

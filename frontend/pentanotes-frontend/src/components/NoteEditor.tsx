@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Save, X, Trash2, Search, Folder as FolderIcon } from 'lucide-react';
 import { Note, Folder } from '../types';
+import { parseNoteLinks } from '../utils/noteLinks';
 
 interface NoteEditorProps {
   note: Note | null;
   folders: Folder[];
   onUpdate: (id: number, title: string, content: string, folderId?: number | null) => Promise<Note>;
   onDelete: (id: number) => void;
+  onLinkClick: (linkName: string, noteId: number, title: string, content: string, folderId: number | null) => Promise<void>;
+  allNotes: Note[];
 }
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate, onDelete }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate, onDelete, onLinkClick, allNotes }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -63,6 +66,43 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
   const handleDelete = () => {
     if (!note) return;
     onDelete(note.id);
+  };
+
+  const handleLinkClick = async (e: React.MouseEvent<HTMLSpanElement>, linkName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (note) {
+      // Use current state (title, content, folderId) which may have unsaved changes
+      await onLinkClick(linkName, note.id, title, content, folderId);
+    }
+  };
+
+  const renderNoteContent = () => {
+    if (!note) return null;
+    
+    const segments = parseNoteLinks(note.content);
+    
+    return segments.map((segment, index) => {
+      if (segment.type === 'link') {
+        // Check if the linked note exists
+        const linkedNoteExists = allNotes.some(
+          (n) => n.title.toLowerCase() === segment.linkName?.toLowerCase()
+        );
+        
+        return (
+          <span
+            key={index}
+            onClick={(e) => handleLinkClick(e, segment.linkName!)}
+            className="cursor-pointer text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+            title={linkedNoteExists ? `Open "${segment.linkName}"` : `Create and open "${segment.linkName}"`}
+          >
+            {segment.content}
+          </span>
+        );
+      }
+      
+      return <span key={index}>{segment.content}</span>;
+    });
   };
 
   if (!note) {
@@ -160,7 +200,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
         ) : (
           <div className="prose max-w-none">
             <pre className="whitespace-pre-wrap font-sans text-gray-1000 text-2xl leading-relaxed">
-              {note.content || 'No content'}
+              {note.content ? renderNoteContent() : 'No content'}
             </pre>
           </div>
         )}

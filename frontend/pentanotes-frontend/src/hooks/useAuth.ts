@@ -7,19 +7,30 @@ export const useAuth = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     if (token) {
       loadProfile();
+    } else {
+      setProfileLoading(false);
+      setUser(null);
     }
   }, [token]);
 
   const loadProfile = async () => {
+    setProfileLoading(true);
     try {
       const profile = await apiService.getProfile();
       setUser(profile);
     } catch (err) {
       console.error('Failed to load profile:', err);
+      // Token is invalid, clear it
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -64,5 +75,5 @@ export const useAuth = () => {
     setUser(null);
   };
 
-  return { token, user, loading, register, login, logout };
+  return { token, user, loading: loading || profileLoading, register, login, logout };
 };

@@ -1,6 +1,7 @@
 import User from './User';
 import Folder from './Folder';
 import Note from './Note';
+import NoteLink from './NoteLink';
 
 
 // Define associations
@@ -34,4 +35,19 @@ Note.belongsTo(User, {
   as: 'user',
 });
 
-export { User, Note, Folder};
+Note.belongsToMany(Note, {
+    through: NoteLink,
+    as: 'outboundLinks', // Alias to find notes this note links to
+    foreignKey: 'sourceId', // The column in NoteLink that holds this note's ID
+    otherKey: 'targetId', // The column in NoteLink that holds the linked note's ID
+});
+
+// 2. Define the relationship from Note to its Backlinks
+Note.belongsToMany(Note, {
+    through: NoteLink,
+    as: 'backlinks', // Alias to find notes that link TO this note
+    foreignKey: 'targetId', // The column in NoteLink that holds this note's ID
+    otherKey: 'sourceId', // The column in NoteLink that holds the linking note's ID
+});
+
+export { User, Note, Folder, NoteLink };

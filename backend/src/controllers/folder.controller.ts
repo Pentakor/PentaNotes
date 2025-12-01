@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { Folder } from '../models';
+import { Folder, Note, NoteLink } from '../models';
+import sequelize from '../config/database';
 
 export const createFolder = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -115,33 +116,47 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
 };
 
 export const deleteFolder = async (req: Request, res: Response): Promise<void> => {
+  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
+    const folderId = parseInt(req.params.id);
     const userId = req.user?.id;
 
-    const folder = await Folder.findOne({
-      where: { id: parseInt(id), userId },
-    });
-
-    if (!folder) {
-      res.status(404).json({
-        success: false,
-        message: 'Folder not found',
-      });
+    if (isNaN(folderId)) {
+      res.status(400).json({ success: false, message: 'Invalid folder ID' });
       return;
     }
 
-    await folder.destroy();
+    const folder = await Folder.findOne({ where: { id: folderId, userId }, transaction: t });
+    if (!folder) {
+      await t.rollback();
+      res.status(404).json({ success: false, message: 'Folder not found' });
+      return;
+    }
+
+    // Get all note IDs in this folder
+    const notes = await Note.findAll({ where: { folderId: folder.id }, attributes: ['id'], raw: true, transaction: t });
+    const noteIds = notes.map(n => n.id);
+
+    if (noteIds.length) {
+      // Delete all NoteLinks in bulk
+      await NoteLink.destroy({ where: { sourceId: noteIds }, transaction: t });
+
+      // Delete all Notes in bulk
+      await Note.destroy({ where: { id: noteIds }, transaction: t });
+    }
+
+    // Delete the folder itself
+    await folder.destroy({ transaction: t });
+
+    await t.commit();
 
     res.status(200).json({
       success: true,
-      message: 'Folder deleted successfully',
+      message: 'Folder and all related notes deleted successfully',
     });
   } catch (error) {
+    await t.rollback();
     console.error('Delete folder error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting folder',
-    });
+    res.status(500).json({ success: false, message: 'Error deleting folder' });
   }
 };

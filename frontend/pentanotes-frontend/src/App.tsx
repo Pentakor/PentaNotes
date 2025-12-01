@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useNotes } from './hooks/useNotes';
 import { useFolders } from './hooks/useFolders';
@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { Note } from './types';
 import { Modal, ModalType } from './components/Modal';
+import { apiService } from './services/api';
 
 type AppModal = {
   isOpen: boolean;
@@ -26,6 +27,7 @@ const App = () => {
   const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [allNotesForLinks, setAllNotesForLinks] = useState<Note[]>([]);
 
   const [modal, setModal] = useState<AppModal>({
     isOpen: false,
@@ -41,6 +43,17 @@ const App = () => {
   const closeModal = () => {
     setModal((prev) => ({ ...prev, isOpen: false }));
   };
+
+  // Load all notes for link existence checking
+  useEffect(() => {
+    if (token) {
+      apiService.getNotes()
+        .then(setAllNotesForLinks)
+        .catch((err) => console.error('Failed to load all notes for links:', err));
+    } else {
+      setAllNotesForLinks([]);
+    }
+  }, [token]);
 
   // FIXED: Just set the note directly - it will render with the title from the API response
   const handleCreateNote = () => {
@@ -201,8 +214,78 @@ const App = () => {
     }
   };
 
+  // Find or create a note by title
+  const findOrCreateNoteByTitle = async (noteTitle: string): Promise<Note> => {
+    try {
+      // Get all notes to search for existing one
+      const allNotes = await apiService.getNotes();
+      const existingNote = allNotes.find((n) => n.title.toLowerCase() === noteTitle.toLowerCase());
+      
+      if (existingNote) {
+        return existingNote;
+      }
+      
+      // Create new note if it doesn't exist
+      const newNote = await createNote(noteTitle, null);
+      
+      // Refresh all notes for link checking
+      const updatedAllNotes = await apiService.getNotes();
+      setAllNotesForLinks(updatedAllNotes);
+      
+      return newNote;
+    } catch (err) {
+      console.error('Failed to find or create note:', err);
+      throw err;
+    }
+  };
+
+  // Handle link click - save current note and navigate to linked note
+  const handleLinkClick = async (
+    linkName: string,
+    noteId: number,
+    title: string,
+    content: string,
+    folderId: number | null
+  ) => {
+    try {
+      // First, save the current note with its current state
+      await handleUpdateNote(noteId, title, content, folderId);
+      
+      // Find or create the linked note
+      const targetNote = await findOrCreateNoteByTitle(linkName);
+      
+      // Open the target note
+      setSelectedNote(targetNote);
+    } catch (err) {
+      showModal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to open linked note',
+      });
+    }
+  };
+
+  // Show login page if no token or no user (invalid token)
+  // But wait if we're still loading the profile
   if (!token) {
     return <LoginPage onLogin={login} onRegister={register} loading={authLoading} />;
+  }
+
+  // If we have a token but no user and we're done loading, token is invalid
+  if (token && !user && !authLoading) {
+    return <LoginPage onLogin={login} onRegister={register} loading={false} />;
+  }
+
+  // If we're still loading the profile, show a loading state
+  if (token && !user && authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -229,6 +312,8 @@ const App = () => {
         folders={folders}
         onUpdate={handleUpdateNote}
         onDelete={handleDeleteNote}
+        onLinkClick={handleLinkClick}
+        allNotes={allNotesForLinks}
       />
 
       {/* Global Modal */}
