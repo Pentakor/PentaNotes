@@ -3,13 +3,14 @@ import { Note } from '../models';
 
 export const createNote = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, content } = req.body;
+    const { title, content, folderId } = req.body;
     const userId = req.user?.id;
 
     const note = await Note.create({
       userId: userId!,
       title,
       content: content || '',
+      folderId: folderId || null,
     });
 
     res.status(201).json({
@@ -48,6 +49,28 @@ export const getNotes = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const getNotesByFolderId = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const notes = await Note.findAll({
+      where: { folderId: parseInt(id), userId },
+      order: [['updatedAt', 'DESC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { notes },
+    });
+  } catch (error) {
+    console.error('Get notes by folder error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notes for folder',
+    });
+  }
+};
+
 export const getNoteById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -81,7 +104,7 @@ export const getNoteById = async (req: Request, res: Response): Promise<void> =>
 export const updateNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, content } = req.body;
+    const { title, content, folderId } = req.body;
     const userId = req.user?.id;
 
     const note = await Note.findOne({
@@ -99,6 +122,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
     // Update only provided fields
     if (title !== undefined) note.title = title;
     if (content !== undefined) note.content = content;
+    if (folderId !== undefined) note.folderId = folderId;
 
     await note.save();
 

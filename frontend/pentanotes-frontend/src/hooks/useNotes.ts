@@ -2,20 +2,24 @@ import { useState, useEffect } from 'react';
 import { Note } from '../types';
 import { apiService } from '../services/api';
 
-export const useNotes = (token: string | null) => {
+export const useNotes = (token: string | null, folderId?: number | null) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (token) {
       loadNotes();
+    } else {
+      setNotes([]);
     }
-  }, [token]);
+  }, [token, folderId]);
 
   const loadNotes = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getNotes();
+      const data = folderId
+        ? await apiService.getNotesByFolder(folderId)
+        : await apiService.getNotes();
       setNotes(data);
     } catch (err) {
       console.error('Failed to load notes:', err);
@@ -24,9 +28,10 @@ export const useNotes = (token: string | null) => {
     }
   };
 
-  const createNote = async (title: string) => {
+  const createNote = async (title: string, targetFolderId?: number | null) => {
     try {
-      const newNote = await apiService.createNote(title || 'Untitled Note', '');
+      const folderForNote = targetFolderId ?? folderId ?? null;
+      const newNote = await apiService.createNote(title || 'Untitled Note', '', folderForNote);
       // FIXED: Use functional update to ensure we have the latest state
       setNotes((prevNotes) => [newNote, ...prevNotes]);
       return newNote;
@@ -36,11 +41,21 @@ export const useNotes = (token: string | null) => {
     }
   };
 
-  const updateNote = async (id: number, title: string, content: string) => {
+  const updateNote = async (
+    id: number,
+    title: string,
+    content: string,
+    nextFolderId?: number | null
+  ) => {
     try {
-      const updatedNote = await apiService.updateNote(id, title, content);
+      const updatedNote = await apiService.updateNote(id, title, content, nextFolderId);
       // FIXED: Use functional update
-      setNotes((prevNotes) => prevNotes.map((n: Note) => n.id === id ? updatedNote : n));
+      setNotes((prevNotes) => {
+        if (folderId && updatedNote.folderId !== folderId) {
+          return prevNotes.filter((n: Note) => n.id !== id);
+        }
+        return prevNotes.map((n: Note) => (n.id === id ? updatedNote : n));
+      });
       return updatedNote;
     } catch (err) {
       console.error('Failed to update note:', err);

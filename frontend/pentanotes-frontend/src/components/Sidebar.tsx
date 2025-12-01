@@ -1,26 +1,40 @@
 import React from 'react';
-import { Search, Plus, User, LogOut } from 'lucide-react';
-import { Note, User as UserType } from '../types';
+import { Search, Plus, User, LogOut, FolderPlus, Folder as FolderIcon, Edit2, Trash2 } from 'lucide-react';
+import { Note, Folder, User as UserType } from '../types';
 
 interface SidebarProps {
   user: UserType | null;
   notes: Note[];
+  folders: Folder[];
   selectedNote: Note | null;
+  selectedFolderId: number | null;
   searchQuery: string;
+  notesLoading?: boolean;
   onSearchChange: (query: string) => void;
   onNoteSelect: (note: Note) => void;
+  onFolderSelect: (folderId: number | null) => void;
   onCreateNote: () => void;
+  onCreateFolder: () => void;
+  onRenameFolder: (folderId: number) => void;
+  onDeleteFolder: (folderId: number) => void;
   onLogout: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   user,
   notes = [],
+  folders = [],
   selectedNote,
+  selectedFolderId,
   searchQuery,
+  notesLoading = false,
   onSearchChange,
   onNoteSelect,
+  onFolderSelect,
   onCreateNote,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
   onLogout,
 }) => {
   const filteredNotes = notes.filter((note) => {
@@ -69,6 +83,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
+      {/* Folder Controls */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold uppercase text-gray-500 tracking-wide">Folders</p>
+          <button
+            onClick={onCreateFolder}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            title="New Folder"
+          >
+            <FolderPlus className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+        <div className="space-y-1">
+          <button
+            onClick={() => onFolderSelect(null)}
+            className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors ${
+              selectedFolderId === null
+                ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <FolderIcon className="w-4 h-4" />
+            All Notes
+          </button>
+          {folders.length === 0 ? (
+            <p className="text-xs text-gray-400 px-3 py-2">No folders yet</p>
+          ) : (
+            folders.map((folder) => (
+              <div
+                key={folder.id}
+                onClick={() => onFolderSelect(folder.id)}
+                className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                  selectedFolderId === folder.id
+                    ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FolderIcon className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate text-sm">{folder.title}</span>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRenameFolder(folder.id);
+                    }}
+                    className="p-1 rounded hover:bg-white/60"
+                    title="Rename folder"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteFolder(folder.id);
+                    }}
+                    className="p-1 rounded hover:bg-white/60 text-red-500"
+                    title="Delete folder"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* New Note Button */}
       <div className="p-4">
         <button
@@ -82,7 +165,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Notes List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredNotes.length === 0 ? (
+        {notesLoading ? (
+          <div className="p-4 text-center text-gray-500">Loading notes...</div>
+        ) : filteredNotes.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             {notes.length === 0 ? 'No notes yet. Create one!' : 'No matching notes'}
           </div>

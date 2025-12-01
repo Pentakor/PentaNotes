@@ -5,6 +5,15 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   userId?: number;
+  folderId?: number;
+}
+
+export interface Folder {
+  id: number;
+  title : string;
+  createdAt: string;
+  updatedAt: string;
+  userId?: number;
 }
 
 export interface User {

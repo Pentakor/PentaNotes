@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useNotes } from './hooks/useNotes';
+import { useFolders } from './hooks/useFolders';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -20,7 +21,9 @@ type AppModal = {
 
 const App = () => {
   const { token, user, loading: authLoading, register, login, logout } = useAuth();
-  const { notes, createNote, updateNote, deleteNote } = useNotes(token);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const { notes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(token, selectedFolderId);
+  const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -51,7 +54,7 @@ const App = () => {
       onConfirm: async (value) => {
         const noteTitle = value?.trim() || 'Untitled Note';
         try {
-          const newNote = await createNote(noteTitle);
+          const newNote = await createNote(noteTitle, selectedFolderId);
           // Just set it - the newNote already has the correct title from the API
           setSelectedNote(newNote);
         } catch (err) {
@@ -59,6 +62,90 @@ const App = () => {
             type: 'error',
             title: 'Error',
             message: 'Failed to create note',
+          });
+        }
+      },
+    });
+  };
+
+  const handleFolderSelect = (folderId: number | null) => {
+    setSelectedFolderId(folderId);
+    setSelectedNote(null);
+  };
+
+  const handleCreateFolder = () => {
+    showModal({
+      type: 'prompt',
+      title: 'New Folder',
+      message: 'Enter folder name:',
+      confirmText: 'Create',
+      cancelText: 'Cancel',
+      defaultValue: '',
+      onConfirm: async (value) => {
+        const folderTitle = value?.trim();
+        if (!folderTitle) {
+          return;
+        }
+        try {
+          const folder = await createFolder(folderTitle);
+          setSelectedFolderId(folder.id);
+        } catch (err) {
+          showModal({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to create folder',
+          });
+        }
+      },
+    });
+  };
+
+  const handleRenameFolder = (folderId: number) => {
+    const folder = folders.find((f) => f.id === folderId);
+    showModal({
+      type: 'prompt',
+      title: 'Rename Folder',
+      message: 'Update folder name:',
+      confirmText: 'Save',
+      cancelText: 'Cancel',
+      defaultValue: folder?.title || '',
+      onConfirm: async (value) => {
+        const folderTitle = value?.trim();
+        if (!folderTitle || folderTitle === folder?.title) {
+          return;
+        }
+        try {
+          await updateFolder(folderId, { title: folderTitle });
+        } catch (err) {
+          showModal({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to rename folder',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteFolder = (folderId: number) => {
+    const folder = folders.find((f) => f.id === folderId);
+    showModal({
+      type: 'confirm',
+      title: 'Delete Folder',
+      message: `Delete "${folder?.title || 'folder'}"? Notes remain accessible from All Notes.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await deleteFolder(folderId);
+          if (selectedFolderId === folderId) {
+            setSelectedFolderId(null);
+          }
+        } catch (err) {
+          showModal({
+            type: 'error',
+            title: 'Error',
+            message: 'Failed to delete folder',
           });
         }
       },
@@ -89,11 +176,20 @@ const App = () => {
     });
   };
 
-  const handleUpdateNote = async (id: number, title: string, content: string) => {
+  const handleUpdateNote = async (
+    id: number,
+    title: string,
+    content: string,
+    folderId?: number | null
+  ) => {
     try {
-      const updatedNote = await updateNote(id, title, content);
+      const updatedNote = await updateNote(id, title, content, folderId);
       // Update the selected note with the response from the API
-      setSelectedNote(updatedNote);
+      if (selectedFolderId && updatedNote.folderId !== selectedFolderId) {
+        setSelectedNote(null);
+      } else {
+        setSelectedNote(updatedNote);
+      }
       return updatedNote;
     } catch (err) {
       showModal({
@@ -114,15 +210,23 @@ const App = () => {
       <Sidebar
         user={user}
         notes={notes}
+        notesLoading={notesLoading}
+        folders={folders}
+        selectedFolderId={selectedFolderId}
         selectedNote={selectedNote}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNoteSelect={setSelectedNote}
+        onFolderSelect={handleFolderSelect}
+        onCreateFolder={handleCreateFolder}
+        onRenameFolder={handleRenameFolder}
+        onDeleteFolder={handleDeleteFolder}
         onCreateNote={handleCreateNote}
         onLogout={logout}
       />
       <NoteEditor
         note={selectedNote}
+        folders={folders}
         onUpdate={handleUpdateNote}
         onDelete={handleDeleteNote}
       />

@@ -1,5 +1,5 @@
 import { API_URL, TOKEN_KEY } from '../config/constants';
-import { Note, User, AuthFormData, LoginCredentials } from '../types';
+import { Note, User, AuthFormData, LoginCredentials, Folder } from '../types';
 
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
@@ -86,11 +86,29 @@ class ApiService {
     return response.data?.notes || response.data || response;
   }
 
-  async createNote(title: string, content: string): Promise<Note> {
+  async getNotesByFolder(folderId: number): Promise<Note[]> {
+    const res = await fetch(`${API_URL}/folders/${folderId}/notes`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch folder notes');
+    }
+
+    const response = await res.json();
+    return response.data?.notes || response.data || response;
+  }
+
+  async createNote(title: string, content: string, folderId?: number | null): Promise<Note> {
+    const payload: Record<string, unknown> = { title, content };
+    if (folderId !== undefined && folderId !== null) {
+      payload.folderId = folderId;
+    }
+
     const res = await fetch(`${API_URL}/notes/`, {
       method: 'POST',
       headers: this.getHeaders(true),
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify(payload),
     });
     
     if (!res.ok) {
@@ -103,11 +121,16 @@ class ApiService {
     return response.data?.note || response.data || response;
   }
 
-  async updateNote(id: number, title: string, content: string): Promise<Note> {
+  async updateNote(id: number, title: string, content: string, folderId?: number | null): Promise<Note> {
+    const payload: Record<string, unknown> = { title, content };
+    if (folderId !== undefined) {
+      payload.folderId = folderId;
+    }
+
     const res = await fetch(`${API_URL}/notes/${id}/`, {
       method: 'PUT',
       headers: this.getHeaders(true),
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify(payload),
     });
     
     if (!res.ok) {
@@ -127,6 +150,65 @@ class ApiService {
     
     if (!res.ok) {
       throw new Error('Failed to delete note');
+    }
+  }
+
+  async getFolders(): Promise<Folder[]> {
+    const res = await fetch(`${API_URL}/folders`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch folders');
+    }
+
+    const response = await res.json();
+    return (
+      response.data?.folders ||
+      response.data?.notes || // backend currently returns data.notes
+      response.data ||
+      response
+    );
+  }
+
+  async createFolder(title: string): Promise<Folder> {
+    const res = await fetch(`${API_URL}/folders`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ title }),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to create folder');
+    }
+
+    const response = await res.json();
+    return response.data?.folder || response.data || response;
+  }
+
+  async updateFolder(id: number, payload: { title?: string }): Promise<Folder> {
+    const res = await fetch(`${API_URL}/folders/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(true),
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to update folder');
+    }
+
+    const response = await res.json();
+    return response.data?.folder || response.data || response;
+  }
+
+  async deleteFolder(id: number): Promise<void> {
+    const res = await fetch(`${API_URL}/folders/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to delete folder');
     }
   }
 }

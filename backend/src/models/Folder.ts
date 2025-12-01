@@ -1,30 +1,25 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import sequelize from '../config/database';
 
-interface NoteAttributes {
+interface FolderAttributes {
   id: number;
   userId: number;
   title: string;
-  content: string;
   createdAt?: Date;
   updatedAt?: Date;
-  folderId?: number;
 }
 
-interface NoteCreationAttributes extends Optional<NoteAttributes, 'id'> {}
+interface FolderCreationAttributes extends Optional<FolderAttributes, 'id'> {}
 
-class Note extends Model<NoteAttributes, NoteCreationAttributes> implements NoteAttributes {
+class Folder extends Model<FolderAttributes, FolderCreationAttributes> implements FolderAttributes {
   public id!: number;
   public userId!: number;
   public title!: string;
-  public content!: string;
-  public folderId?: number;
-
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
 
-Note.init(
+Folder.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -41,37 +36,20 @@ Note.init(
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE',
     },
-    folderId: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'folders',
-        key: 'id',
-      },
-      onDelete: 'CASCADE',
-      onUpdate: 'CASCADE',
-    },
     title: {
       type: DataTypes.STRING(255),
       allowNull: false,
-    },
-    content: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      defaultValue: '',
-    },
+    }
   },
   {
     sequelize,
-    tableName: 'notes',
+    tableName: 'folders',
     timestamps: true,
 
     indexes: [
       { fields: ['userId'] },
-      { fields: ['folderId'] },
-      { fields: ['userId', 'folderId'] },
     ],
   }
 );
 
-export default Note;
+export default Folder;

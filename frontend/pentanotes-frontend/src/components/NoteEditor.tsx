@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Save, X, Trash2, Search } from 'lucide-react';
-import { Note } from '../types';
+import { Edit2, Save, X, Trash2, Search, Folder as FolderIcon } from 'lucide-react';
+import { Note, Folder } from '../types';
 
 interface NoteEditorProps {
   note: Note | null;
-  onUpdate: (id: number, title: string, content: string) => Promise<Note>;
+  folders: Folder[];
+  onUpdate: (id: number, title: string, content: string, folderId?: number | null) => Promise<Note>;
   onDelete: (id: number) => void;
 }
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate, onDelete }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [folderId, setFolderId] = useState<number | null>(null);
 
   useEffect(() => {
     if (note) {
       setTitle(note.title);
       setContent(note.content);
+      setFolderId(note.folderId ?? null);
       setIsEditing(false);
     }
   }, [note]);
@@ -24,7 +27,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
   const handleSave = async () => {
     if (!note) return;
     try {
-      await onUpdate(note.id, title, content);
+      await onUpdate(note.id, title, content, folderId);
       setIsEditing(false);
     } catch (err) {
       console.error('Save failed:', err);
@@ -35,9 +38,27 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
     if (note) {
       setTitle(note.title);
       setContent(note.content);
+      setFolderId(note.folderId ?? null);
     }
     setIsEditing(false);
   };
+  const handleFolderChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!note) return;
+    const value = event.target.value;
+    const nextFolderId = value ? parseInt(value, 10) : null;
+    if ((note.folderId ?? null) === nextFolderId) {
+      setFolderId(nextFolderId);
+      return;
+    }
+    setFolderId(nextFolderId);
+    try {
+      await onUpdate(note.id, note.title, note.content, nextFolderId);
+    } catch (err) {
+      console.error('Failed to move note:', err);
+      setFolderId(note.folderId ?? null);
+    }
+  };
+
 
   const handleDelete = () => {
     if (!note) return;
@@ -58,7 +79,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
   return (
     <div className="flex-1 flex flex-col">
       {/* Note Header */}
-      <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex-1">
           {isEditing ? (
             <input
@@ -71,7 +92,23 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
             <h2 className="text-2xl font-bold text-gray-900">{note.title}</h2>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <FolderIcon className="w-4 h-4 text-gray-500" />
+            <select
+              value={folderId ?? ''}
+              onChange={handleFolderChange}
+              className="border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+            >
+              <option value="">No folder</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex gap-2">
           {isEditing ? (
             <>
               <button
@@ -107,6 +144,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete
               </button>
             </>
           )}
+          </div>
         </div>
       </div>
 
