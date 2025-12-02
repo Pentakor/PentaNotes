@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Note, NoteLink } from '../models';
 import sequelize from '../config/database';
+import { Op } from 'sequelize';
 
 const getLinkedNotes = async (content: string): Promise<number[]> => {
   const regex = /\[\[(.*?)\]\]/g;
@@ -261,24 +262,40 @@ const attachLinkedNoteIds = async (notes: any[]) => {
 
   const noteIds = notes.map(n => n.id);
 
-  // Fetch all links for these notes
+  // Fetch ALL links where current notes are either source OR target
   const links = await NoteLink.findAll({
-    where: { sourceId: noteIds },
+    where: {
+      [Op.or]: [
+        { sourceId: noteIds }, // outgoing
+        { targetId: noteIds }, // incoming (backlinks)
+      ],
+    },
     attributes: ['sourceId', 'targetId'],
     raw: true,
   });
 
-  // Create a map: sourceId -> [targetId, ...]
-  const linkMap: Record<number, number[]> = {};
+  // Maps
+  const outgoingMap: Record<number, number[]> = {};
+  const incomingMap: Record<number, number[]> = {};
+
   links.forEach(link => {
-    if (!linkMap[link.sourceId]) linkMap[link.sourceId] = [];
-    linkMap[link.sourceId].push(link.targetId);
+    // Outgoing links (normal)
+    if (noteIds.includes(link.sourceId)) {
+      if (!outgoingMap[link.sourceId]) outgoingMap[link.sourceId] = [];
+      outgoingMap[link.sourceId].push(link.targetId);
+    }
+
+    // Incoming links (backlinks)
+    if (noteIds.includes(link.targetId)) {
+      if (!incomingMap[link.targetId]) incomingMap[link.targetId] = [];
+      incomingMap[link.targetId].push(link.sourceId);
+    }
   });
 
-  // Attach linkedNoteIds to each note
   return notes.map(n => ({
-    ...n.dataValues, // preserve Sequelize model fields
-    linkedNoteIds: linkMap[n.id] || [],
+    ...n.dataValues,
+    linkedNoteIds: outgoingMap[n.id] || [],
+    backlinkNoteIds: incomingMap[n.id] || [],
   }));
 };
 

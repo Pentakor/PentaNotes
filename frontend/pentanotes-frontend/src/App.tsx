@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useNotes } from './hooks/useNotes';
 import { useFolders } from './hooks/useFolders';
@@ -7,7 +7,6 @@ import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { Note } from './types';
 import { Modal, ModalType } from './components/Modal';
-import { apiService } from './services/api';
 
 type AppModal = {
   isOpen: boolean;
@@ -23,12 +22,10 @@ type AppModal = {
 const App = () => {
   const { token, user, loading: authLoading, register, login, logout } = useAuth();
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
-  const { notes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(token, selectedFolderId);
+  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(token, selectedFolderId);
   const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [allNotesForLinks, setAllNotesForLinks] = useState<Note[]>([]);
-
   const [modal, setModal] = useState<AppModal>({
     isOpen: false,
     type: 'alert',
@@ -43,17 +40,6 @@ const App = () => {
   const closeModal = () => {
     setModal((prev) => ({ ...prev, isOpen: false }));
   };
-
-  // Load all notes for link existence checking
-  useEffect(() => {
-    if (token) {
-      apiService.getNotes()
-        .then(setAllNotesForLinks)
-        .catch((err) => console.error('Failed to load all notes for links:', err));
-    } else {
-      setAllNotesForLinks([]);
-    }
-  }, [token]);
 
   // FIXED: Just set the note directly - it will render with the title from the API response
   const handleCreateNote = () => {
@@ -218,7 +204,6 @@ const App = () => {
   const findOrCreateNoteByTitle = async (noteTitle: string): Promise<Note> => {
     try {
       // Get all notes to search for existing one
-      const allNotes = await apiService.getNotes();
       const existingNote = allNotes.find((n) => n.title.toLowerCase() === noteTitle.toLowerCase());
       
       if (existingNote) {
@@ -226,13 +211,7 @@ const App = () => {
       }
       
       // Create new note if it doesn't exist
-      const newNote = await createNote(noteTitle, null);
-      
-      // Refresh all notes for link checking
-      const updatedAllNotes = await apiService.getNotes();
-      setAllNotesForLinks(updatedAllNotes);
-      
-      return newNote;
+      return await createNote(noteTitle, null);
     } catch (err) {
       console.error('Failed to find or create note:', err);
       throw err;
@@ -313,7 +292,7 @@ const App = () => {
         onUpdate={handleUpdateNote}
         onDelete={handleDeleteNote}
         onLinkClick={handleLinkClick}
-        allNotes={allNotesForLinks}
+        allNotes={allNotes}
       />
 
       {/* Global Modal */}

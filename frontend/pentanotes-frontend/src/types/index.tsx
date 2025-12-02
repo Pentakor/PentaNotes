@@ -7,6 +7,7 @@ export interface Note {
   userId?: number;
   folderId?: number;
   linkedNoteIds?: number[];
+  backlinkNoteIds?: number[];
 }
 
 export interface Folder {

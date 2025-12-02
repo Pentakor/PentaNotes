@@ -86,6 +86,19 @@ class ApiService {
     return response.data?.notes || response.data || response;
   }
 
+  async getNoteById(id: number): Promise<Note> {
+    const res = await fetch(`${API_URL}/notes/${id}/`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch note');
+    }
+
+    const response = await res.json();
+    return response.data?.note || response.data || response;
+  }
+
   async getNotesByFolder(folderId: number): Promise<Note[]> {
     const res = await fetch(`${API_URL}/folders/${folderId}/notes`, {
       headers: this.getHeaders(true),
@@ -155,7 +168,7 @@ class ApiService {
   }
 
   async getFolders(): Promise<Folder[]> {
-    const res = await fetch(`${API_URL}/folders`, {
+    const res = await fetch(`${API_URL}/folders/`, {
       headers: this.getHeaders(true),
     });
 
@@ -173,7 +186,7 @@ class ApiService {
   }
 
   async createFolder(title: string): Promise<Folder> {
-    const res = await fetch(`${API_URL}/folders`, {
+    const res = await fetch(`${API_URL}/folders/`, {
       method: 'POST',
       headers: this.getHeaders(true),
       body: JSON.stringify({ title }),

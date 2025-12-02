@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Edit2, Save, X, Trash2, Search, Folder as FolderIcon } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Edit2, Save, X, Trash2, Search, Folder as FolderIcon, Info } from 'lucide-react';
 import { Note, Folder } from '../types';
 import { parseNoteLinks } from '../utils/noteLinks';
+import { apiService } from '../services/api';
 
 interface NoteEditorProps {
+  
   note: Note | null;
   folders: Folder[];
   onUpdate: (id: number, title: string, content: string, folderId?: number | null) => Promise<Note>;
@@ -13,10 +15,20 @@ interface NoteEditorProps {
 }
 
 export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate, onDelete, onLinkClick, allNotes }) => {
+  const [showMeta, setShowMeta] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaData, setMetaData] = useState<Note | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [folderId, setFolderId] = useState<number | null>(null);
+  const metaSource = metaData ?? note;
+  const noteTitleMap = useMemo(() => {
+    const map = new Map<number, string>();
+    allNotes.forEach((n) => map.set(n.id, n.title || `Note ${n.id}`));
+    return map;
+  }, [allNotes]);
 
   useEffect(() => {
     if (note) {
@@ -24,7 +36,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
       setContent(note.content);
       setFolderId(note.folderId ?? null);
       setIsEditing(false);
+    } else {
+      setTitle('');
+      setContent('');
+      setFolderId(null);
     }
+    setShowMeta(false);
+    setMetaData(null);
+    setMetaError(null);
+    setMetaLoading(false);
   }, [note]);
 
   const handleSave = async () => {
@@ -45,7 +65,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
     }
     setIsEditing(false);
   };
-  const handleFolderChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleFolderChange = async (event: React.ChangeEvent<HTMLSelectElement>) => { ///LJDHGLKUDSGHJ
     if (!note) return;
     const value = event.target.value;
     const nextFolderId = value ? parseInt(value, 10) : null;
@@ -55,7 +75,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
     }
     setFolderId(nextFolderId);
     try {
-      await onUpdate(note.id, note.title, note.content, nextFolderId);
+      await await onUpdate(note.id, title, content, nextFolderId);
     } catch (err) {
       console.error('Failed to move note:', err);
       setFolderId(note.folderId ?? null);
@@ -77,6 +97,39 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
     }
   };
 
+  const handleMetaToggle = async () => {
+    if (!note) return;
+    const nextState = !showMeta;
+    setShowMeta(nextState);
+    if (!nextState) {
+      setMetaData(null);
+      setMetaError(null);
+      setMetaLoading(false);
+      return;
+    }
+
+    setMetaLoading(true);
+    setMetaError(null);
+    try {
+      const details = await apiService.getNoteById(note.id);
+      setMetaData(details);
+    } catch (err) {
+      console.error('Failed to load note metadata:', err);
+      setMetaError('Failed to load note details');
+    } finally {
+      setMetaLoading(false);
+    }
+  };
+
+  const formatNoteNames = (ids?: number[]) => {
+    if (!ids || ids.length === 0) {
+      return 'None';
+    }
+    return ids
+      .map((id) => noteTitleMap.get(id) || `Note ${id}`)
+      .join(', ');
+  };
+
   const renderNoteContent = () => {
     if (!note) return null;
     
@@ -93,7 +146,11 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
           <span
             key={index}
             onClick={(e) => handleLinkClick(e, segment.linkName!)}
-            className="cursor-pointer text-indigo-600 hover:text-indigo-800 hover:underline font-medium"
+            className={`cursor-pointer ${
+              linkedNoteExists
+                ? 'text-indigo-600 hover:text-indigo-800 hover:underline font-medium'
+                : 'text-orange-600 hover:text-orange-800 hover:underline font-medium'
+            }`}
             title={linkedNoteExists ? `Open "${segment.linkName}"` : `Create and open "${segment.linkName}"`}
           >
             {segment.content}
@@ -129,9 +186,24 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
               className="text-2xl font-bold w-full border-b-2 border-indigo-600 focus:outline-none"
             />
           ) : (
-            <h2 className="text-2xl font-bold text-gray-900">{note.title}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-gray-900">{note.title}</h2>
+              <button
+                onClick={handleMetaToggle}
+                aria-pressed={showMeta}
+                title="View note info"
+                className={`p-2 rounded-full border transition-colors ${
+                  showMeta
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                    : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <Info className="w-4 h-4" />
+              </button>
+            </div>
           )}
         </div>
+
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <FolderIcon className="w-4 h-4 text-gray-500" />
@@ -149,6 +221,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
             </select>
           </label>
           <div className="flex gap-2">
+
           {isEditing ? (
             <>
               <button
@@ -187,6 +260,49 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
           </div>
         </div>
       </div>
+{/* Metadata Panel */}
+{showMeta && note && (
+  <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 text-sm text-gray-700 space-y-2">
+    {metaLoading && <p className="text-gray-500">Loading note info...</p>}
+    {!metaLoading && metaError && <p className="text-red-600">{metaError}</p>}
+    {!metaLoading && !metaError && metaSource && (
+      <>
+        <div><strong>Note ID:</strong> {metaSource.id}</div>
+
+        <div>
+          <strong>Folder:</strong>{' '}
+          {folders.find((f) => f.id === metaSource.folderId)?.title ?? 'No folder'}
+        </div>
+
+        <div>
+          <strong>Created:</strong>{' '}
+          {new Date(metaSource.createdAt).toLocaleString()}
+        </div>
+
+        <div>
+          <strong>Updated:</strong>{' '}
+          {new Date(metaSource.updatedAt).toLocaleString()}
+        </div>
+
+        <div>
+          <strong>Linked Notes:</strong>{' '}
+          {metaSource.linkedNoteIds?.length ?? 0}
+        </div>
+        <div className="text-xs text-gray-500 break-words">
+          {formatNoteNames(metaSource.linkedNoteIds)}
+        </div>
+
+        <div>
+          <strong>Backlinks:</strong>{' '}
+          {metaSource.backlinkNoteIds?.length ?? 0}
+        </div>
+        <div className="text-xs text-gray-500 break-words">
+          {formatNoteNames(metaSource.backlinkNoteIds)}
+        </div>
+      </>
+    )}
+  </div>
+)}
 
       {/* Note Content */}
       <div className="flex-1 overflow-y-auto p-8">
