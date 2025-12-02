@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import { Folder, Note, NoteLink } from '../models';
+import { Folder, Note, NoteLink, NoteTag, Tag } from '../models';
 import sequelize from '../config/database';
+import { Op } from 'sequelize';
 
 export const createFolder = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -30,14 +31,14 @@ export const getFolders = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = req.user?.id;
 
-    const notes = await Folder.findAll({
+    const tags = await Folder.findAll({
       where: { userId },
       order: [['updatedAt', 'DESC']],
     });
 
     res.status(200).json({
       success: true,
-      data: { notes },
+      data: { tags },
     });
   } catch (error) {
     console.error('Get folders error:', error);
@@ -73,7 +74,7 @@ export const getFolderById = async (req: Request, res: Response): Promise<void> 
     console.error('Get folder error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching note',
+      message: 'Error fetching tag',
     });
   }
 };
@@ -115,6 +116,50 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// OPTIMIZED: Helper function to clean up tags when deleting notes
+const cleanupTagsForNotes = async (noteIds: number[], transaction: any): Promise<void> => {
+  if (!noteIds.length) return;
+
+  // Get all tag IDs and their counts in ONE query using GROUP BY
+  const noteTags = await NoteTag.findAll({
+    where: { noteId: noteIds },
+    attributes: [
+      'tagId',
+      [sequelize.fn('COUNT', sequelize.col('tagId')), 'count'],
+    ],
+    group: ['tagId'],
+    raw: true,
+    transaction,
+  });
+
+  if (!noteTags.length) return;
+
+  // Decrement each tag by its specific count using Sequelize increment
+  for (const noteTag of noteTags as any[]) {
+    const tagId = noteTag.tagId;
+    const count = parseInt(noteTag.count);
+
+    // Decrement by the specific count
+    await Tag.increment(
+      { noteCount: -count },
+      {
+        where: { id: tagId },
+        transaction,
+      }
+    );
+  }
+
+  // Bulk delete tags with 0 or negative count
+  const tagIds = noteTags.map((nt: any) => nt.tagId);
+  await Tag.destroy({
+    where: {
+      id: tagIds,
+      noteCount: { [Op.lte]: 0 },
+    },
+    transaction,
+  });
+};
+
 export const deleteFolder = async (req: Request, res: Response): Promise<void> => {
   const t = await sequelize.transaction();
   try {
@@ -134,14 +179,22 @@ export const deleteFolder = async (req: Request, res: Response): Promise<void> =
     }
 
     // Get all note IDs in this folder
-    const notes = await Note.findAll({ where: { folderId: folder.id }, attributes: ['id'], raw: true, transaction: t });
+    const notes = await Note.findAll({ 
+      where: { folderId: folder.id }, 
+      attributes: ['id'], 
+      raw: true, 
+      transaction: t 
+    });
     const noteIds = notes.map(n => n.id);
 
     if (noteIds.length) {
+      // Clean up tags for all notes (optimized bulk operation)
+      await cleanupTagsForNotes(noteIds, t);
+
       // Delete all NoteLinks in bulk
       await NoteLink.destroy({ where: { sourceId: noteIds }, transaction: t });
 
-      // Delete all Notes in bulk
+      // Delete all Notes in bulk (cascade will handle NoteTag)
       await Note.destroy({ where: { id: noteIds }, transaction: t });
     }
 
