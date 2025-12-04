@@ -478,3 +478,42 @@ const attachLinkedNoteIds = async (notes: any[]) => {
     tagNames: tagMap[n.id] || [],
   }));
 };
+
+export const getNotesByTagId = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tagId = parseInt(req.params.id);
+
+    if (isNaN(tagId)) {
+      res.status(400).json({ success: false, message: 'Invalid tag ID' });
+      return;
+    }
+
+    const userId = req.user?.id;
+
+    const notes = await Note.findAll({
+      where: { userId },
+      include: [
+        {
+          model: Tag,
+          as: 'tags',
+          where: { id: tagId },
+          through: { attributes: [] },
+        },
+      ],
+      order: [['updatedAt', 'DESC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { notes },
+    });
+
+  } catch (error) {
+    console.error('Get notes by tag error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notes for tag',
+    });
+  }
+};

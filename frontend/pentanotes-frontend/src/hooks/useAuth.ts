@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import { User, AuthFormData, LoginCredentials } from '../types';
 import { TOKEN_KEY } from '../config/constants';
@@ -11,16 +11,23 @@ export const useAuth = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const { showError } = useModal();
 
+  const lastProfileToken = useRef<string | null>(null);
+
   useEffect(() => {
-    if (token) {
-      loadProfile();
-    } else {
+    if (!token) {
+      lastProfileToken.current = null;
       setProfileLoading(false);
       setUser(null);
+      return;
     }
+    if (lastProfileToken.current === token) {
+      return;
+    }
+    lastProfileToken.current = token;
+    void loadProfile(token);
   }, [token]);
 
-  const loadProfile = async () => {
+  const loadProfile = async (currentToken: string) => {
     setProfileLoading(true);
     try {
       const profile = await apiService.getProfile();

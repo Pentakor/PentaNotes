@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Folder } from '../types';
 import { apiService } from '../services/api';
 
@@ -6,19 +6,26 @@ export const useFolders = (token: string | null) => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const lastTokenRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (token) {
-      loadFolders();
-    } else {
+    if (!token) {
+      lastTokenRef.current = null;
       setFolders([]);
+      return;
     }
+    if (lastTokenRef.current === token) {
+      return;
+    }
+    lastTokenRef.current = token;
+    void loadFolders();
   }, [token]);
 
   const loadFolders = async () => {
     setLoading(true);
     try {
       const data = await apiService.getFolders();
-      setFolders(data);
+      setFolders(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load folders:', err);
     } finally {

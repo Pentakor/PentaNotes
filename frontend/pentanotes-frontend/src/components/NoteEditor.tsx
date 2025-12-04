@@ -5,16 +5,24 @@ import { parseNoteLinks } from '../utils/noteLinks';
 import { apiService } from '../services/api';
 
 interface NoteEditorProps {
-  
   note: Note | null;
   folders: Folder[];
   onUpdate: (id: number, title: string, content: string, folderId?: number | null) => Promise<Note>;
   onDelete: (id: number) => void;
   onLinkClick: (linkName: string, noteId: number, title: string, content: string, folderId: number | null) => Promise<void>;
+  onTagClick?: (tagName: string) => void;
   allNotes: Note[];
 }
 
-export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate, onDelete, onLinkClick, allNotes }) => {
+export const NoteEditor: React.FC<NoteEditorProps> = ({
+  note,
+  folders,
+  onUpdate,
+  onDelete,
+  onLinkClick,
+  onTagClick,
+  allNotes,
+}) => {
   const [showMeta, setShowMeta] = useState(false);
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaData, setMetaData] = useState<Note | null>(null);
@@ -152,6 +160,18 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
                 : 'text-orange-600 hover:text-orange-800 hover:underline font-medium'
             }`}
             title={linkedNoteExists ? `Open "${segment.linkName}"` : `Create and open "${segment.linkName}"`}
+          >
+            {segment.content}
+          </span>
+        );
+      }
+      if (segment.type === 'tag') {
+        return (
+          <span
+            key={index}
+            onClick={() => segment.tagName && onTagClick?.(segment.tagName)}
+            className="text-green-600 font-medium cursor-pointer hover:text-green-700"
+            title={`Tag: #${segment.tagName}`}
           >
             {segment.content}
           </span>
@@ -299,6 +319,22 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({ note, folders, onUpdate,
         <div className="text-xs text-gray-500 break-words">
           {formatNoteNames(metaSource.backlinkNoteIds)}
         </div>
+        <div>
+          <strong>Tags:</strong>{' '}
+          {metaSource.tagNames && metaSource.tagNames.length > 0 ? '' : 'None'}
+        </div>
+        {metaSource.tagNames && metaSource.tagNames.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {metaSource.tagNames.map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
       </>
     )}
   </div>

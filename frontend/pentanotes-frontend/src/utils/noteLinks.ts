@@ -1,7 +1,8 @@
 export interface LinkSegment {
-  type: 'text' | 'link';
+  type: 'text' | 'link' | 'tag';
   content: string;
   linkName?: string;
+  tagName?: string;
 }
 
 /**
@@ -13,7 +14,7 @@ export const parseNoteLinks = (content: string): LinkSegment[] => {
   if (!content) return [{ type: 'text', content: '' }];
 
   const segments: LinkSegment[] = [];
-  const regex = /\[\[(.*?)\]\]/g;
+  const regex = /(\[\[(.*?)\]\]|#[\w-]+)/g;
   let lastIndex = 0;
   let match;
 
@@ -26,13 +27,21 @@ export const parseNoteLinks = (content: string): LinkSegment[] => {
       });
     }
 
-    // Add the link
-    const linkName = match[1].trim();
-    segments.push({
-      type: 'link',
-      content: match[0], // Full match including [[ ]]
-      linkName,
-    });
+    if (match[0].startsWith('[[')) {
+      const linkName = match[2]?.trim() ?? '';
+      segments.push({
+        type: 'link',
+        content: match[0],
+        linkName,
+      });
+    } else if (match[0].startsWith('#')) {
+      const tagName = match[0].substring(1);
+      segments.push({
+        type: 'tag',
+        content: match[0],
+        tagName,
+      });
+    }
 
     lastIndex = regex.lastIndex;
   }

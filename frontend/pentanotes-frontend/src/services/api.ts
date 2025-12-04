@@ -1,5 +1,5 @@
 import { API_URL, TOKEN_KEY } from '../config/constants';
-import { Note, User, AuthFormData, LoginCredentials, Folder } from '../types';
+import { Note, User, AuthFormData, LoginCredentials, Folder, Tag } from '../types';
 
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
@@ -177,12 +177,26 @@ class ApiService {
     }
 
     const response = await res.json();
-    return (
+    const payload =
       response.data?.folders ||
+      response.folders ||
       response.data?.notes || // backend currently returns data.notes
       response.data ||
-      response
-    );
+      response;
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (payload?.folders && Array.isArray(payload.folders)) {
+      return payload.folders;
+    }
+
+    if (payload?.notes && Array.isArray(payload.notes)) {
+      return payload.notes;
+    }
+
+    return [];
   }
 
   async createFolder(title: string): Promise<Folder> {
@@ -224,6 +238,42 @@ class ApiService {
     if (!res.ok) {
       throw new Error('Failed to delete folder');
     }
+  }
+
+  async getTags(): Promise<Tag[]> {
+    const res = await fetch(`${API_URL}/tags/`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch tags');
+    }
+
+    const response = await res.json();
+    const payload = response.data?.tags || response.tags || response.data || response;
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (payload?.tags && Array.isArray(payload.tags)) {
+      return payload.tags;
+    }
+
+    return [];
+  }
+
+  async getNotesByTag(tagId: number): Promise<Note[]> {
+    const res = await fetch(`${API_URL}/tags/${tagId}/notes`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch notes for tag');
+    }
+
+    const response = await res.json();
+    return response.data?.notes || response.notes || response.data || response;
   }
 }
 

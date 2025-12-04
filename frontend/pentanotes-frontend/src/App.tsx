@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useNotes } from './hooks/useNotes';
 import { useFolders } from './hooks/useFolders';
+import { useTags } from './hooks/useTags';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -22,8 +23,22 @@ type AppModal = {
 const App = () => {
   const { token, user, loading: authLoading, register, login, logout } = useAuth();
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
-  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(token, selectedFolderId);
+  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
   const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
+  const { tags, loading: tagsLoading, refreshTags } = useTags(token);
+
+  const selectedTagName = useMemo(() => {
+    if (selectedTagId === null) {
+      return null;
+    }
+    return tags.find((tag) => tag.id === selectedTagId)?.name ?? null;
+  }, [selectedTagId, tags]);
+
+  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(
+    token,
+    selectedFolderId,
+    selectedTagName
+  );
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modal, setModal] = useState<AppModal>({
@@ -67,9 +82,49 @@ const App = () => {
     });
   };
 
+  useEffect(() => {
+    if (!token) {
+      setSelectedTagId(null);
+      return;
+    }
+    if (selectedTagId !== null && !tags.some((tag) => tag.id === selectedTagId)) {
+      setSelectedTagId(null);
+    }
+  }, [selectedTagId, tags, token]);
+
   const handleFolderSelect = (folderId: number | null) => {
     setSelectedFolderId(folderId);
+    setSelectedTagId(null);
     setSelectedNote(null);
+  };
+
+  const handleTagSelect = (tagId: number | null) => {
+    setSelectedTagId(tagId);
+    if (tagId !== null) {
+      setSelectedFolderId(null);
+    }
+    setSelectedNote(null);
+  };
+
+  const normalizeTagName = (value: string) => value.replace(/^#/, '').trim().toLowerCase();
+
+  const handleTagFocus = async (tagName: string) => {
+    const normalized = normalizeTagName(tagName);
+    if (!normalized) {
+      return;
+    }
+    const findTagByName = (collection: typeof tags) =>
+      collection.find((tag) => tag.name.toLowerCase() === normalized);
+
+    let targetTag = findTagByName(tags);
+    if (!targetTag) {
+      const refreshed = await refreshTags();
+      targetTag = findTagByName(refreshed);
+    }
+    if (targetTag) {
+      setSelectedTagId(targetTag.id);
+      setSelectedFolderId(null);
+    }
   };
 
   const handleCreateFolder = () => {
@@ -88,6 +143,8 @@ const App = () => {
         try {
           const folder = await createFolder(folderTitle);
           setSelectedFolderId(folder.id);
+          setSelectedTagId(null);
+          setSelectedNote(null);
         } catch (err) {
           showModal({
             type: 'error',
@@ -164,6 +221,7 @@ const App = () => {
           if (selectedNote?.id === id) {
             setSelectedNote(null);
           }
+          await refreshTags();
         } catch (err) {
           showModal({
             type: 'error',
@@ -189,6 +247,7 @@ const App = () => {
       } else {
         setSelectedNote(updatedNote);
       }
+      await refreshTags();
       return updatedNote;
     } catch (err) {
       showModal({
@@ -274,12 +333,16 @@ const App = () => {
         notes={notes}
         notesLoading={notesLoading}
         folders={folders}
+        tags={tags}
         selectedFolderId={selectedFolderId}
+        selectedTagId={selectedTagId}
         selectedNote={selectedNote}
+        tagsLoading={tagsLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNoteSelect={setSelectedNote}
         onFolderSelect={handleFolderSelect}
+        onTagSelect={handleTagSelect}
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
@@ -292,6 +355,7 @@ const App = () => {
         onUpdate={handleUpdateNote}
         onDelete={handleDeleteNote}
         onLinkClick={handleLinkClick}
+        onTagClick={handleTagFocus}
         allNotes={allNotes}
       />
 

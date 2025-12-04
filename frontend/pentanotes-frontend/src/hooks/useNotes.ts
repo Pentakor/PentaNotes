@@ -1,25 +1,46 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Note } from '../types';
 import { apiService } from '../services/api';
 
-export const useNotes = (token: string | null, folderId?: number | null) => {
+export const useNotes = (
+  token: string | null,
+  folderId?: number | null,
+  tagName?: string | null
+) => {
   const [allNotes, setAllNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const lastTokenRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (token) {
-      loadNotes();
-    } else {
+    if (!token) {
+      lastTokenRef.current = null;
       setAllNotes([]);
+      return;
     }
+    if (lastTokenRef.current === token) {
+      return;
+    }
+    lastTokenRef.current = token;
+    void loadNotes();
   }, [token]);
 
   const notes = useMemo(() => {
-    if (!folderId) {
-      return allNotes;
+    let filtered = allNotes;
+
+    if (folderId !== undefined && folderId !== null) {
+      filtered = filtered.filter((note) => (note.folderId ?? null) === folderId);
     }
-    return allNotes.filter((note) => note.folderId === folderId);
-  }, [allNotes, folderId]);
+
+    if (tagName) {
+      const lowered = tagName.toLowerCase();
+      filtered = filtered.filter((note) =>
+        note.tagNames?.some((tag) => tag.toLowerCase() === lowered)
+      );
+    }
+
+    return filtered;
+  }, [allNotes, folderId, tagName]);
 
   const loadNotes = async () => {
     setLoading(true);

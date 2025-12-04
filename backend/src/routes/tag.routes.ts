@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import {
 //   createTag,
-//   getTags,
+  getTags,
   getTagById,
   deleteTag,
 } from '../controllers/tag.controller';
+
+import { getNotesByTagId } from '../controllers/note.controller';
 import { validate } from '../middleware/validation';
 import {
   createTagSchema,
@@ -19,8 +21,9 @@ const router = Router();
 router.use(authenticate);
 
 // router.post('/', validate(createTagSchema), createTag);
-// router.get('/', getTags);
+router.get('/', getTags);
 router.get('/:id', validate(getTagSchema), getTagById);
+router.get('/:id/notes', validate(getTagSchema), getNotesByTagId);
 router.delete('/:id', validate(deleteTagSchema), deleteTag);
 
 export default router;

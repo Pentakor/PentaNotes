@@ -26,26 +26,26 @@ import sequelize from '../config/database';
 //   }
 // };
 
-// export const getTags = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const userId = req.user?.id;
+export const getTags = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
 
-//     const tags = await Tag.findAll({
-//       where: { userId },
-//     });
+    const tags = await Tag.findAll({
+      where: { userId },
+    });
 
-//     res.status(200).json({
-//       success: true,
-//       data: { tags },
-//     });
-//   } catch (error) {
-//     console.error('Get tags error:', error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Error tags notes',
-//     });
-//   }
-// };
+    res.status(200).json({
+      success: true,
+      data: { tags },
+    });
+  } catch (error) {
+    console.error('Get tags error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error tags notes',
+    });
+  }
+};
 
 export const getTagById = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -123,3 +123,4 @@ export const deleteTag = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
+

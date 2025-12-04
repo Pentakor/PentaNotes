@@ -1,3 +1,10 @@
+export interface Tag {
+  id: number;
+  userId: number;
+  name: string;
+  noteCount: number;
+}
+
 export interface Note {
   id: number;
   title: string;
@@ -8,11 +15,13 @@ export interface Note {
   folderId?: number;
   linkedNoteIds?: number[];
   backlinkNoteIds?: number[];
+  tags?: Tag[];
+  tagNames?: string[];
 }
 
 export interface Folder {
   id: number;
-  title : string;
+  title: string;
   createdAt: string;
   updatedAt: string;
   userId?: number;
