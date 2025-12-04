@@ -1,14 +1,17 @@
 import { Request, Response } from 'express';
-import { User } from '../models';
-import { generateToken } from '../utils/jwt';
+import {
+  getProfileService,
+  loginUserService,
+  registerUserService,
+} from '../services/auth.service';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, name, password } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
+    const result = await registerUserService(email, name, password);
+
+    if (result.exists) {
       res.status(400).json({
         success: false,
         message: 'User with this email already exists',
@@ -16,15 +19,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Create new user
-    const user = await User.create({ email, name, password });
-
-    // Generate token
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    });
+    const { user, token } = result;
 
     res.status(201).json({
       success: true,
@@ -32,9 +27,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       data: {
         token,
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: user!.id,
+          email: user!.email,
+          name: user!.name,
         },
       },
     });
@@ -51,9 +46,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ where: { email } });
-    if (!user) {
+    const result = await loginUserService(email, password);
+
+    if (!result) {
       res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -61,22 +56,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Check password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      res.status(401).json({
-        success: false,
-        message: 'Invalid email or password',
-      });
-      return;
-    }
-
-    // Generate token
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    });
+    const { user, token } = result;
 
     res.status(200).json({
       success: true,
@@ -103,9 +83,7 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = req.user?.id;
 
-    const user = await User.findByPk(userId, {
-      attributes: ['id', 'email', 'name', 'createdAt', 'updatedAt'],
-    });
+    const user = await getProfileService(userId!);
 
     if (!user) {
       res.status(404).json({
