@@ -40,3 +40,13 @@ A modern note-taking web application built with **TypeScript**, **Node.js**, **E
 - **Other Tools:** ts-node-dev, bcryptjs, Postman, tailwind
 
 ---
+
+
+After installation and activation:
+docker start pg
+
+cd backend
+npm run dev
+
+cd frontend/pentanotes-frontend
+npm start

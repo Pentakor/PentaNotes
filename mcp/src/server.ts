@@ -1,57 +1,57 @@
-// src/server.ts
 import express, { Request, Response } from 'express';
-import dotenv from 'dotenv';
-import { McpRequestBody, mcpSchema } from './schemas/mcpSchema'; // Import schema and type
-import { validate } from './middleware/validation'; // Import validation middleware
+import { PORT } from './config/env';
+import { McpRequestBody, mcpSchema } from './schemas/mcpSchema';
+import { validate } from './middleware/validation';
+import { runAI } from './LLM/api';
 
-// Load environment variables
-dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middleware to parse JSON bodies
 app.use(express.json());
 
-// --- Helper function to extract the Bearer Token ---
+// --- Helper function to extract Bearer token ---
 const extractBearerToken = (req: Request): string | null => {
   const authHeader = req.headers['authorization'];
-  
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    // Return the token part
     return authHeader.split(' ')[1];
   }
   return null;
 };
 
-// --- The single POST /mcp route ---
+// --- Adjusted POST /mcp route ---
 app.post(
   '/mcp',
-  validate(mcpSchema), // 👈 Apply Zod validation middleware here
-  (req: Request<{}, {}, McpRequestBody>, res: Response) => {
-    
-    // At this point, req.body is guaranteed to be valid according to McpRequestBody type
+  validate(mcpSchema),
+  async (req: Request<{}, {}, McpRequestBody>, res: Response) => {
     const token = extractBearerToken(req);
     const { message, userId } = req.body;
 
-    // Log extracted data to console
-    console.log(`Token Extracted: ${token ? token : 'NONE'}`);
+    //console.log(`Token Extracted: ${token ?? 'NONE'}`);
     console.log(`User ID: ${userId}, Message: "${message}"`);
 
-    // Send success response
-    res.status(200).json({ 
-      status: 'success', 
-      message: 'Data validated and processed.',
-      extractedToken: token, 
-      data: {
-          receivedMessage: message,
-          receivedUserId: userId
-      }
-    });
+    try {
+      const aiResponse = await runAI({
+        userMessage: message,
+        token,
+        userId,
+      });
+
+      res.status(200).json({
+        status: 'success',
+        message: 'AI processed the request successfully.',
+        data: aiResponse,
+      });
+    } catch (error) {
+      console.error('AI processing error:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to process AI request',
+        error: error instanceof Error ? error.message : error,
+      });
+    }
   }
 );
 
-// --- Start the server ---
 app.listen(PORT, () => {
+  
   console.log(`✅ Server is running on http://localhost:${PORT}`);
 });

@@ -1,0 +1,26 @@
+{
+  "tools": [
+    {
+      "name": "create-note",
+      "description": "Tool call that creates a new note in the system. Use carefully with #tags and [[links]].",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the note. MUST be provided."
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional content of the note. You can include #tags to create tags and [[links]] to link other notes."
+          },
+          "folderId": {
+            "type": "number",
+            "description": "Optional folder ID to place the note in. Use only if known."
+          }
+        },
+        "required": ["title"]
+      }
+    }
+  ]
+}
