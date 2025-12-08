@@ -12,12 +12,21 @@ export const createFolder = async (req: Request, res: Response): Promise<void> =
     const { title } = req.body;
     const userId = req.user?.id;
 
-    const folder = await createFolderService(userId!, title);
+    const result = await createFolderService(userId!, title);
+
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A folder with this title already exists',
+      });
+      return;
+    }
 
     res.status(201).json({
       success: true,
       message: 'Folder created successfully',
-      data: { folder },
+      data: { folder: result.folder },
     });
   } catch (error) {
     console.error('Create folder error:', error);
@@ -81,9 +90,9 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
     const { title, content } = req.body;
     const userId = req.user?.id;
 
-    const folder = await updateFolderService(userId!, parseInt(id), { title });
+    const result = await updateFolderService(userId!, parseInt(id), { title });
 
-    if (!folder) {
+    if (!result) {
       res.status(404).json({
         success: false,
         message: 'Folder not found',
@@ -91,10 +100,19 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A folder with this title already exists',
+      });
+      return;
+    }
+
     res.status(200).json({
       success: true,
       message: 'Folder updated successfully',
-      data: { folder },
+      data: { folder: result.folder },
     });
   } catch (error) {
     console.error('Update folder error:', error);

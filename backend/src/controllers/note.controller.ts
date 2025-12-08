@@ -18,12 +18,21 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
 
     const result = await createNoteService(userId!, title, content, folderId);
 
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A note with this title already exists',
+      });
+      return;
+    }
+
     res.status(201).json({
       success: true,
       message: 'Note created successfully',
       data: {
         note: {
-          ...result.note.dataValues,
+          ...result.note!.dataValues,
           linkedNoteIds: result.linkedNoteIds,
           tagNames: result.tagNames,
         },
@@ -123,8 +132,18 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
     const userId = req.user?.id;
 
     const result = await updateNoteService(userId!, noteId, { title, content, folderId });
+    
     if (!result) {
       res.status(404).json({ success: false, message: 'Note not found' });
+      return;
+    }
+
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A note with this title already exists',
+      });
       return;
     }
 
@@ -135,7 +154,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
       message: 'Note updated successfully',
       data: {
         note: {
-          ...note.dataValues,
+          ...note!.dataValues,
           linkedNoteIds,
           tagNames,
         },

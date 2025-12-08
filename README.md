@@ -8,11 +8,23 @@ A modern note-taking web application built with **TypeScript**, **Node.js**, **E
 
 - ✅ Create, read, update, and delete notes a (CRUD)
 - ✅ Type-safe validation using **Zod**
+- ✅ **Note linking** to connect related notes
+- ✅ **Tag system** to tag notes
 - ✅ Folders structure feature for better user expirience
-- 🟡 Planned: AI agent to **summarize notes** and **categorize by topics**
-- 🟡 Planned: **Note linking** to connect related notes
+
+- 🟡 Planned: Email verification on signup
+- 🟡 Planned: Note sharing via email
+- 🟡 Planned: Markdown content type (instead of plain text)
+- 🟡 Planned: Folders inside folders
+- 🟡 Planned: AI agent to **summarize notes**, **tag notes**, **smart search**, **categorize by topics**, **auto completion**
+- 🟡 Planned: Admin dashboard
+- 🟡 Planned: Locking notes by password
+- 🟡 Planned: Dark Mode
+- 🟡 Planned: Pinning notes
+- 🟡 Planned: Pinning notes
 - 🟡 Planned: **Redis caching** for faster note retrieval
 - 🟡 Planned: **Cloud deployment** for online access
+
 
 ---
 

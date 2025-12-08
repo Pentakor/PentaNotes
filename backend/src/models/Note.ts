@@ -70,6 +70,11 @@ Note.init(
       { fields: ['userId'] },
       { fields: ['folderId'] },
       { fields: ['userId', 'folderId'] },
+
+      {
+        unique: true,
+        fields: ['userId', 'title'],
+      },
     ],
   }
 );

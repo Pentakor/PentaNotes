@@ -229,12 +229,28 @@ export const createNoteService = async (
 ) => {
   const t = await sequelize.transaction();
   try {
+    // Check if a note with the same title already exists for this user
+    const existingNote = await Note.findOne({
+      where: { userId, title },
+      transaction: t,
+    });
+
+    if (existingNote) {
+      await t.rollback();
+      return {
+        error: 'DUPLICATE_TITLE',
+        note: null,
+        linkedNoteIds: [],
+        tagNames: [],
+      };
+    }
+
     const note = await Note.create(
       {
         userId,
         title,
         content: content || '',
-        folderId: folderId || null,
+        folderId: folderId || undefined,
       },
       { transaction: t }
     );
@@ -305,8 +321,32 @@ export const updateNoteService = async (
 
     const { title, content, folderId } = updates;
 
-    if (title !== undefined) note.title = title;
-    if (folderId !== undefined) note.folderId = folderId;
+    // Check if title is being updated and if it conflicts with another note
+    // Check if title is being updated and if it conflicts with another note
+    if (title !== undefined && title !== note.title) {
+      const existingNote = await Note.findOne({
+        where: {
+          userId,
+          title,
+          id: { [Op.ne]: noteId }, // Exclude current note from check
+        },
+        transaction: t,
+      });
+
+      if (existingNote) {
+        await t.rollback();
+        return {
+          error: 'DUPLICATE_TITLE',
+          note: null,
+          linkedNoteIds: [],
+          tagNames: [],
+        };
+      }
+
+      note.title = title;
+    }
+
+    if (folderId !== undefined) note.folderId = folderId ?? undefined;
     if (content !== undefined) note.content = content;
     await note.save({ transaction: t });
 
@@ -390,5 +430,3 @@ export const deleteNoteService = async (userId: number, noteId: number) => {
     throw error;
   }
 };
-
-

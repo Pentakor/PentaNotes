@@ -1,14 +1,27 @@
 import { Folder, Note, NoteLink } from '../models';
 import sequelize from '../config/database';
 import { cleanupTagsForNotes } from './note.service';
+import { Op } from 'sequelize';
 
 export const createFolderService = async (userId: number, title: string) => {
+  // Check if a folder with the same title already exists for this user
+  const existingFolder = await Folder.findOne({
+    where: { userId, title },
+  });
+
+  if (existingFolder) {
+    return {
+      error: 'DUPLICATE_TITLE',
+      folder: null,
+    };
+  }
+
   const folder = await Folder.create({
     userId,
     title,
   });
 
-  return folder;
+  return { folder };
 };
 
 export const getFoldersService = async (userId: number) => {
@@ -43,11 +56,29 @@ export const updateFolderService = async (
 
   const { title } = updates;
 
-  if (title !== undefined) folder.title = title;
+  // Check if title is being updated and if it conflicts with another folder
+  if (title !== undefined && title !== folder.title) {
+    const existingFolder = await Folder.findOne({
+      where: {
+        userId,
+        title,
+        id: { [Op.ne]: id }, // Exclude current folder from check
+      },
+    });
+
+    if (existingFolder) {
+      return {
+        error: 'DUPLICATE_TITLE',
+        folder: null,
+      };
+    }
+
+    folder.title = title;
+  }
 
   await folder.save();
 
-  return folder;
+  return { folder };
 };
 
 export const deleteFolderService = async (userId: number, folderId: number) => {
@@ -85,5 +116,3 @@ export const deleteFolderService = async (userId: number, folderId: number) => {
     throw error;
   }
 };
-
-
