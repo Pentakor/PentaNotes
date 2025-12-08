@@ -72,11 +72,15 @@ const App = () => {
           // Just set it - the newNote already has the correct title from the API
           setSelectedNote(newNote);
         } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to create note';
           showModal({
             type: 'error',
             title: 'Error',
-            message: 'Failed to create note',
+            message: errorMessage,
           });
+          // Re-throw so the modal stays open on failure
+          throw err;
         }
       },
     });
@@ -146,11 +150,15 @@ const App = () => {
           setSelectedTagId(null);
           setSelectedNote(null);
         } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to create folder';
           showModal({
             type: 'error',
             title: 'Error',
-            message: 'Failed to create folder',
+            message: errorMessage,
           });
+          // Re-throw so the modal stays open on failure
+          throw err;
         }
       },
     });

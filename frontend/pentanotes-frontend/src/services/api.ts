@@ -123,11 +123,20 @@ class ApiService {
       headers: this.getHeaders(true),
       body: JSON.stringify(payload),
     });
-    
+
     if (!res.ok) {
-      throw new Error('Failed to create note');
+      let errorMessage = 'Failed to create note';
+      try {
+        const errorBody = await res.json();
+        if (errorBody?.message) {
+          errorMessage = errorBody.message;
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse create note error response:', parseErr);
+      }
+      throw new Error(errorMessage);
     }
-    
+
     const response = await res.json();
     console.log('Create note response:', response);
     // FIXED: Extract note from nested structure data.note
@@ -207,7 +216,16 @@ class ApiService {
     });
 
     if (!res.ok) {
-      throw new Error('Failed to create folder');
+      let errorMessage = 'Failed to create folder';
+      try {
+        const errorBody = await res.json();
+        if (errorBody?.message) {
+          errorMessage = errorBody.message;
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse create folder error response:', parseErr);
+      }
+      throw new Error(errorMessage);
     }
 
     const response = await res.json();

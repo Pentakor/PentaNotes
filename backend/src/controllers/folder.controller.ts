@@ -41,11 +41,11 @@ export const getFolders = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = req.user?.id;
 
-    const tags = await getFoldersService(userId!);
+    const folders = await getFoldersService(userId!);
 
     res.status(200).json({
       success: true,
-      data: { tags },
+      data: { folders },
     });
   } catch (error) {
     console.error('Get folders error:', error);

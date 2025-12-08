@@ -149,12 +149,17 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
 
     const { note, linkedNoteIds, tagNames } = result;
 
+    if (!note) {
+      res.status(404).json({ success: false, message: 'Note not found' });
+      return;
+    }
+
     res.status(200).json({
       success: true,
       message: 'Note updated successfully',
       data: {
         note: {
-          ...note!.dataValues,
+          ...note.dataValues,
           linkedNoteIds,
           tagNames,
         },
