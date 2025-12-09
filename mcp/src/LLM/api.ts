@@ -1,64 +1,80 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createNote } from "../tools/backendapi";
-import { GEMINI_API_KEY } from '../config/env';
+import { GEMINI_API_KEY, MODEL } from '../config/env';
 import fs from "fs";
-
+import { Content } from '../types/content';
+import { getConversationHistory } from '../helpers/conversationHistory';
 
 // ---------------------------
-// Types for content parts
+// Tool Registry
 // ---------------------------
-type ContentPart =
-  | { text: string }
-  | { functionCall: any }
-  | { functionResponse: any };
-
-interface Content {
-  role: "user" | "model";
-  parts: ContentPart[];
+interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: string;
+    properties: Record<string, any>;
+    required: string[];
+  };
 }
 
-// ---------------------------
-// Load tools from JSON file
-// ---------------------------
-const toolsFile = fs.readFileSync("./src/tools/tools.json", "utf-8");
-const toolsData: any = JSON.parse(toolsFile);
+interface ToolsConfig {
+  tools: ToolDefinition[];
+}
 
-const createNoteTool = toolsData.tools.find((t: any) => t.name === "create-note");
-if (!createNoteTool) throw new Error("create-note tool not found in tools.json");
-
-// ---------------------------
-// Map of all tool functions
-// ---------------------------
-const toolFunctions: Record<string, Function> = {
-  "create-note": async (args: any) => {
-    const { title, content, folderId, token } = args;
-    return createNote(title, content || "", token);
-  },
+// Map JSON types to SDK types
+const TYPE_MAP: Record<string, any> = {
+  string: Type.STRING,
+  number: Type.NUMBER,
+  boolean: Type.BOOLEAN,
+  object: Type.OBJECT,
+  array: Type.ARRAY,
 };
 
 // ---------------------------
-// Convert tools.json to SDK format
+// Load configuration
 // ---------------------------
-const tools = [
-  {
-    functionDeclarations: [
-      {
-        name: createNoteTool.name,
-        description: createNoteTool.description,
-        parameters: {
-          type: Type.OBJECT,
-          properties: Object.fromEntries(
-            Object.entries(createNoteTool.parameters.properties).map(([key, val]: any) => [
-              key,
-              { type: val.type === "string" ? Type.STRING : Type.NUMBER },
-            ])
-          ),
-          required: createNoteTool.parameters.required,
-        },
-      },
-    ],
+const toolsFile = fs.readFileSync("./src/tools/tools.json", "utf-8");
+const systemPrompt = fs.readFileSync("./src/LLM/prompt.txt", "utf-8");
+const toolsConfig: ToolsConfig = JSON.parse(toolsFile);
+
+// ---------------------------
+// Tool implementations
+// ---------------------------
+const toolImplementations: Record<string, Function> = {
+  "create-note": async (args: any) => {
+    const { title, content, token } = args;
+    return createNote(title, content || "", token);
   },
-];
+  // Add more tool implementations here as needed
+};
+
+// ---------------------------
+// Convert tools.json to SDK format automatically
+// ---------------------------
+function convertToolsToSDKFormat(toolsConfig: ToolsConfig) {
+  return [{
+    functionDeclarations: toolsConfig.tools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: Type.OBJECT,
+        properties: Object.fromEntries(
+          Object.entries(tool.parameters.properties).map(([key, val]: any) => [
+            key,
+            {
+              type: TYPE_MAP[val.type] || Type.STRING,
+              description: val.description,
+            },
+          ])
+        ),
+        required: tool.parameters.required,
+      },
+    })),
+  }];
+}
+
+const tools = convertToolsToSDKFormat(toolsConfig);
 
 // ---------------------------
 // Configure AI client
@@ -66,7 +82,28 @@ const tools = [
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // ---------------------------
-// AI loop (dynamic) ---------------------------
+// Execute tool with automatic token injection
+// ---------------------------
+async function executeTool(
+  name: string,
+  args: any,
+  token: string | null
+): Promise<any> {
+  const implementation = toolImplementations[name];
+  
+  if (!implementation) {
+    throw new Error(`Tool implementation not found: ${name}`);
+  }
+
+  // Automatically inject token if needed
+  const argsWithToken = { ...args, token };
+  
+  return implementation(argsWithToken);
+}
+
+// ---------------------------
+// AI loop (dynamic)
+// ---------------------------
 export async function runAI({
   userMessage,
   token,
@@ -74,63 +111,61 @@ export async function runAI({
 }: {
   userMessage: string;
   token: string | null;
-  userId?: number;
+  userId: number;
 }) {
-  // Initialize contents with the user's message
+  const history = userId ? getConversationHistory(userId) : [];
+  
   const contents: Content[] = [
+    ...history,
     {
       role: "user",
-      parts: [
-        {
-          text: userMessage,
-        },
-      ],
+      parts: [{ text: userMessage }],
     },
   ];
 
+  console.log("Contents:", contents);
+  console.log("Tools:", tools);
+
   while (true) {
     const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: MODEL,
       contents,
-      config: { tools },
+      config: {
+        tools,
+        systemInstruction: systemPrompt,
+      },
     });
 
     if (result.functionCalls && result.functionCalls.length > 0) {
-        const functionCall = result.functionCalls[0];
-        const name = functionCall.name;
-        const args = functionCall.args || {}; // <-- ensure it's never undefined
+      const functionCall = result.functionCalls[0];
+      const { name, args = {} } = functionCall;
 
-        if (!name || !toolFunctions[name]) {
-            throw new Error(`Unknown or missing function call name: ${name}`);
-        }
+      if (!name) {
+        throw new Error("Function call missing name");
+      }
 
-        // Inject token for create-note
-        if (name === "create-note") {
-            args.token = token;
-        }
+      // Execute the tool
+      const toolResponse = await executeTool(name, args, token);
 
-        // Call the tool
-        const toolResponse = await toolFunctions[name](args);
-
-        const functionResponsePart = {
-        name,
-        response: { result: toolResponse },
-        };
-
-      // Push the functionCall back to the model
+      // Add function call to conversation
       contents.push({
         role: "model",
         parts: [{ functionCall }],
       });
 
-      // Push the tool response as a user message
+      // Add tool response to conversation
       contents.push({
         role: "user",
-        parts: [{ functionResponse: functionResponsePart }],
+        parts: [{
+          functionResponse: {
+            name,
+            response: { result: toolResponse },
+          },
+        }],
       });
     } else {
-      // No more function calls, return the model output
-      return result.text;
+      // No more function calls, return final response
+      return result.text || "No response generated";
     }
   }
 }

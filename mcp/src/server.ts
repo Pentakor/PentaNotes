@@ -3,19 +3,14 @@ import { PORT } from './config/env';
 import { McpRequestBody, mcpSchema } from './schemas/mcpSchema';
 import { validate } from './middleware/validation';
 import { runAI } from './LLM/api';
+import { extractBearerToken } from './helpers/tokenextraction';
+import { addToConversationHistory } from './helpers/conversationHistory';
 
 
 const app = express();
 app.use(express.json());
 
 // --- Helper function to extract Bearer token ---
-const extractBearerToken = (req: Request): string | null => {
-  const authHeader = req.headers['authorization'];
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.split(' ')[1];
-  }
-  return null;
-};
 
 // --- Adjusted POST /mcp route ---
 app.post(
@@ -34,6 +29,8 @@ app.post(
         token,
         userId,
       });
+
+      addToConversationHistory(userId, message, aiResponse);
 
       res.status(200).json({
         status: 'success',

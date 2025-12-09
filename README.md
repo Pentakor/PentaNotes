@@ -50,3 +50,6 @@ npm run dev
 
 cd frontend/pentanotes-frontend
 npm start
+
+cd mcp
+npm start
