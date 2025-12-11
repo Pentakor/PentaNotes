@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { createNote } from "../tools/backendapi";
+import { createNote, updateNote, getFolders, getTags, getNotes, createFolder } from "../tools/backendapi";
 import { GEMINI_API_KEY, MODEL } from '../config/env';
 import fs from "fs";
 import { Content } from '../types/content';
@@ -46,6 +46,35 @@ const toolImplementations: Record<string, Function> = {
     const { title, content, token } = args;
     return createNote(title, content || "", token);
   },
+  "update-note": async (args: any) => {
+    const { noteId, title, content, folderId, token } = args;
+
+    return updateNote(
+      noteId,
+      { title, content, folderId },
+      token
+    );
+  },
+  "get-folders": async (args: any) => {
+  const { token } = args;
+  return getFolders(token);
+  },
+
+  "get-tags": async (args: any) => {
+  const { token } = args;
+  return getTags(token);
+  },
+
+  "get-notes": async (args: any) => {
+  const { token } = args;
+  return getNotes(token);
+  },
+
+  "create-folder": async (args: any) => {
+  const { title, token } = args;
+  return createFolder(title, token);
+  },
+
   // Add more tool implementations here as needed
 };
 
