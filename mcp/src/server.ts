@@ -5,9 +5,18 @@ import { validate } from './middleware/validation';
 import { runAI } from './LLM/api';
 import { extractBearerToken } from './helpers/tokenextraction';
 import { addToConversationHistory } from './helpers/conversationHistory';
-
+import cors from 'cors';
 
 const app = express();
+
+app.use(cors({
+  origin: 'http://localhost:3000',        // your frontend port
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+
 app.use(express.json());
 
 // --- Helper function to extract Bearer token ---

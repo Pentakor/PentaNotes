@@ -8,6 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { Note } from './types';
 import { Modal, ModalType } from './components/Modal';
+import { ChatBot } from './components/ChatBot';
 
 type AppModal = {
   isOpen: boolean;
@@ -379,6 +380,9 @@ const App = () => {
         onClose={closeModal}
         onConfirm={modal.onConfirm}
       />
+
+      {/* ChatBot - only shows when user is logged in */}
+      {user && <ChatBot user={user} />}
     </div>
   );
 };

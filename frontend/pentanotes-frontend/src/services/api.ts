@@ -293,6 +293,21 @@ class ApiService {
     const response = await res.json();
     return response.data?.notes || response.notes || response.data || response;
   }
+
+  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string }> {
+  const res = await fetch('http://localhost:8080/mcp', {
+    method: 'POST',
+    headers: this.getHeaders(true), // This includes the Bearer token
+    body: JSON.stringify({ message, userId }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to send message to MCP server');
+  }
+
+  const response = await res.json();
+  return response;
+}
 }
 
 export const apiService = new ApiService();
