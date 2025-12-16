@@ -1,0 +1,131 @@
+name: notesapp
+
+services:
+  # PostgreSQL for Backend
+  postgres:
+    image: postgres:16-alpine
+    container_name: notesapp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: notesdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - notesapp-network
+
+  # MongoDB for MCP
+  mongodb:
+    image: mongo:7.0
+    container_name: notesapp-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: notesapp
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - notesapp-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: notesapp-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    networks:
+      - notesapp-network
+    healthcheck:
+      test: curl -f http://localhost:8000/api/auth/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MCP AI Server
+  mcp-server:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    container_name: notesapp-mcp
+    env_file:
+      - ./mcp/.env
+    environment:
+      BACKEND_URL: http://backend
+      MONGODB_URI: mongodb://root:password@mongodb:27017/notesapp?authSource=admin
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./mcp/src:/app/src
+    networks:
+      - notesapp-network
+    restart: on-failure
+    healthcheck:
+      test: curl -f http://localhost:8080/health || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: notesapp-frontend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - notesapp-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  mongodb_config:
+
+networks:
+  notesapp-network:
+    driver: bridge
