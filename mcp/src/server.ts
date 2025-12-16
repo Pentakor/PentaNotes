@@ -1,63 +1,78 @@
-import express, { Request, Response } from 'express';
-import { PORT } from './config/env';
-import { McpRequestBody, mcpSchema } from './schemas/mcpSchema';
-import { validate } from './middleware/validation';
-import { runAI } from './LLM/api';
-import { extractBearerToken } from './helpers/tokenextraction';
-import { addToConversationHistory } from './helpers/conversationHistory';
+import express from 'express';
 import cors from 'cors';
+import { PORT } from './config/env';
+import { connectDatabase } from './database/connection';
+import { mcpRouter } from './routes/mcp.routes';
+import { logger } from './utils/logger';
 
 const app = express();
 
-app.use(cors({
-  origin: 'http://localhost:3000',        // your frontend port
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
-
+// ---------------------------
+// Middleware
+// ---------------------------
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
 
 app.use(express.json());
 
-// --- Helper function to extract Bearer token ---
+// ---------------------------
+// Routes
+// ---------------------------
+app.use('/mcp', mcpRouter);
 
-// --- Adjusted POST /mcp route ---
-app.post(
-  '/mcp',
-  validate(mcpSchema),
-  async (req: Request<{}, {}, McpRequestBody>, res: Response) => {
-    const token = extractBearerToken(req);
-    const { message, userId } = req.body;
-
-    //console.log(`Token Extracted: ${token ?? 'NONE'}`);
-    console.log(`User ID: ${userId}, Message: "${message}"`);
-
-    try {
-      const aiResponse = await runAI({
-        userMessage: message,
-        token,
-        userId,
-      });
-
-      addToConversationHistory(userId, message, aiResponse);
-
-      res.status(200).json({
-        status: 'success',
-        message: 'AI processed the request successfully.',
-        data: aiResponse,
-      });
-    } catch (error) {
-      console.error('AI processing error:', error);
-      res.status(500).json({
-        status: 'error',
-        message: 'Failed to process AI request',
-        error: error instanceof Error ? error.message : error,
-      });
-    }
-  }
-);
-
-app.listen(PORT, () => {
-  
-  console.log(`✅ Server is running on http://localhost:${PORT}`);
+// ---------------------------
+// Health Check
+// ---------------------------
+app.get('/health', (req, res) => {
+  const now = new Date().toLocaleString('en-IL', { 
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  res.status(200).json({ status: 'ok', timestamp: now });
 });
+
+// ---------------------------
+// Error Handler
+// ---------------------------
+app.use((err: any, req: any, res: any, next: any) => {
+  logger.error('Unhandled middleware error', err);
+  res.status(500).json({
+    status: 'error',
+    message: 'Internal server error',
+    error: err.message,
+  });
+});
+
+// ---------------------------
+// Start Server
+// ---------------------------
+async function startServer() {
+  try {
+    // Connect to MongoDB
+    await connectDatabase();
+
+    app.listen(PORT, () => {
+      logger.info('Server started', { port: PORT, url: `http://localhost:${PORT}` });
+    });
+  } catch (error) {
+    logger.error(
+      'Failed to start server',
+      error instanceof Error ? error : new Error(String(error))
+    );
+    process.exit(1);
+  }
+}
+
+startServer();

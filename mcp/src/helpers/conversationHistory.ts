@@ -1,42 +1,31 @@
 import { Content } from '../types/content';
-import {MAX_HISTORY_MESSAGES} from '../config/env';
+import { MAX_HISTORY_MESSAGES } from '../config/env';
+import { ConversationHistoryService } from '../database/conversationHistoryModel';
 
-// Store conversations in memory (userId -> conversation history)
-const conversationStore = new Map<number, Content[]>();
-
-
-export const getConversationHistory = (userId: number): Content[] => {
-  return conversationStore.get(userId) || [];
+/**
+ * Get conversation history for a user
+ * @deprecated Use ConversationHistoryService.getHistory() for new code
+ */
+export const getConversationHistory = async (userId: number): Promise<Content[]> => {
+  return ConversationHistoryService.getHistory(userId);
 };
 
-export const addToConversationHistory = (
+/**
+ * Add to conversation history
+ * @deprecated Use ConversationHistoryService.addToHistory() for new code
+ */
+export const addToConversationHistory = async (
   userId: number,
   userMessage: string,
   aiResponse: string
-): void => {
-  const history = conversationStore.get(userId) || [];
-  
-  // Add user message
-  history.push({
-    role: 'user',
-    parts: [{ text: userMessage }]
-  });
-  
-  // Add AI response
-  history.push({
-    role: 'model',
-    parts: [{ text: aiResponse }]
-  });
-  
-  // Keep only last N pairs (N*2 messages since each pair = user + model)
-  const maxMessages = MAX_HISTORY_MESSAGES * 2;
-  if (history.length > maxMessages) {
-    history.splice(0, history.length - maxMessages);
-  }
-  
-  conversationStore.set(userId, history);
+): Promise<void> => {
+  await ConversationHistoryService.addToHistory(userId, userMessage, aiResponse, MAX_HISTORY_MESSAGES);
 };
 
-export const clearConversationHistory = (userId: number): void => {
-  conversationStore.delete(userId);
+/**
+ * Clear conversation history for a user
+ * @deprecated Use ConversationHistoryService.clearHistory() for new code
+ */
+export const clearConversationHistory = async (userId: number): Promise<void> => {
+  await ConversationHistoryService.clearHistory(userId);
 };

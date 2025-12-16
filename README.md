@@ -21,7 +21,6 @@ A modern note-taking web application built with **TypeScript**, **Node.js**, **E
 - 🟡 Planned: Locking notes by password
 - 🟡 Planned: Dark Mode
 - 🟡 Planned: Pinning notes
-- 🟡 Planned: Pinning notes
 - 🟡 Planned: **Redis caching** for faster note retrieval
 - 🟡 Planned: **Cloud deployment** for online access
 
@@ -53,3 +52,5 @@ npm start
 
 cd mcp
 npm start
+
+

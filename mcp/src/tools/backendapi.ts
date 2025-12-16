@@ -1,46 +1,85 @@
-import { BACKEND_PORT, BACKEND_URL} from '../config/env';
+import { BACKEND_PORT, BACKEND_URL } from '../config/env';
 
-type CreateNoteResponse = {
+// ---------------------------
+// Types
+// ---------------------------
+type ApiResponse<T = any> = {
   success: boolean;
-  data?: any;
+  data?: T;
   message?: string;
 };
 
-export async function createNote(title: string, content: string, token: string): Promise<CreateNoteResponse> {
-
+// ---------------------------
+// HTTP Client Helper
+// ---------------------------
+/**
+ * Builds the base URL for backend API calls
+ */
+function getBaseUrl(): string {
   if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
+    throw new Error('BACKEND_URL or BACKEND_PORT is not defined in environment');
   }
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/notes/`;
-  console.log(url);
+  return `${BACKEND_URL}:${BACKEND_PORT}`;
+}
 
-  const res = await fetch(url, {
-    method: "POST",
+/**
+ * Generic HTTP request helper with automatic error handling
+ */
+async function apiRequest<T = any>(
+  endpoint: string,
+  options: {
+    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+    token: string;
+    body?: Record<string, any>;
+  }
+): Promise<T> {
+  const { method = 'GET', token, body } = options;
+  const url = `${getBaseUrl()}${endpoint}`;
+
+  const fetchOptions: RequestInit = {
+    method,
     headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      title,
-      content,
-    }),
-  });
+  };
+
+  if (body) {
+    fetchOptions.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url, fetchOptions);
 
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(`Failed to create note: ${res.status} - ${errorText}`);
+    throw new Error(`HTTP ${res.status}: ${errorText}`);
   }
 
   return res.json();
 }
 
+// ---------------------------
+// API Endpoints
+// ---------------------------
 
-type UpdateNoteResponse = {
-  success: boolean;
-  data?: any;
-  message?: string;
-};
+/**
+ * Creates a new note
+ */
+export async function createNote(
+  title: string,
+  content: string,
+  token: string
+): Promise<ApiResponse> {
+  return apiRequest('/api/notes/', {
+    method: 'POST',
+    token,
+    body: { title, content },
+  });
+}
 
+/**
+ * Updates an existing note
+ */
 export async function updateNote(
   noteId: number,
   updates: {
@@ -49,129 +88,51 @@ export async function updateNote(
     folderId?: number;
   },
   token: string
-): Promise<UpdateNoteResponse> {
+): Promise<ApiResponse> {
+  // Filter out undefined fields
+  const body = Object.fromEntries(
+    Object.entries(updates).filter(([, value]) => value !== undefined)
+  );
 
-  if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
-  }
-
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/notes/${noteId}/`;
-  console.log(url);
-
-  // Only include fields that are actually defined
-  const body: any = {};
-  if (updates.title !== undefined) body.title = updates.title;
-  if (updates.content !== undefined) body.content = updates.content;
-  if (updates.folderId !== undefined) body.folderId = updates.folderId;
-
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
+  return apiRequest(`/api/notes/${noteId}/`, {
+    method: 'PUT',
+    token,
+    body,
   });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to update note: ${res.status} - ${errorText}`);
-  }
-
-  return res.json();
 }
 
-export async function getFolders(token: string) {
-  if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
-  }
-
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/folders/`;
-  console.log(url);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to fetch folders: ${res.status} - ${errorText}`);
-  }
-
-  return res.json();
+/**
+ * Fetches all folders for the authenticated user
+ */
+export async function getFolders(token: string): Promise<ApiResponse> {
+  return apiRequest('/api/folders/', { token });
 }
 
-export async function getTags(token: string) {
-  if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
-  }
-
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/tags/`;
-  console.log(url);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to fetch tags: ${res.status} - ${errorText}`);
-  }
-
-  return res.json();
+/**
+ * Fetches all tags for the authenticated user
+ */
+export async function getTags(token: string): Promise<ApiResponse> {
+  return apiRequest('/api/tags/', { token });
 }
 
-export async function getNotes(token: string) {
-  if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
-  }
-
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/notes/`;
-  console.log(url);
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-    },
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to fetch notes: ${res.status} - ${errorText}`);
-  }
-
-  return res.json();
+/**
+ * Fetches all notes for the authenticated user
+ */
+export async function getNotes(token: string): Promise<ApiResponse> {
+  return apiRequest('/api/notes/', { token });
 }
 
-export async function createFolder(title: string, token: string) {
-  if (!BACKEND_URL || !BACKEND_PORT) {
-    throw new Error("BACKEND_URL or BACKEND_PORT is not defined in env");
-  }
-
-  const url = `${BACKEND_URL}:${BACKEND_PORT}/api/folders/`;
-  console.log(url);
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({ title }),
+/**
+ * Creates a new folder
+ */
+export async function createFolder(
+  title: string,
+  token: string
+): Promise<ApiResponse> {
+  return apiRequest('/api/folders/', {
+    method: 'POST',
+    token,
+    body: { title },
   });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to create folder: ${res.status} - ${errorText}`);
-  }
-
-  return res.json();
 }
 

@@ -75,7 +75,7 @@
         "required": []
       }
     },
-    {
+     {
   "name": "create-folder",
   "description": "Creates a new folder with a title.",
   "parameters": {
@@ -89,6 +89,7 @@
     "required": ["title"]
   }
 }
+   
 
   ]
 }
