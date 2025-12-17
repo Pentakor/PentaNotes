@@ -4,6 +4,14 @@ import { cleanupTagsForNotes } from './note.service';
 import { Op } from 'sequelize';
 
 export const createFolderService = async (userId: number, title: string) => {
+  // Prevent creating a folder with the reserved name 'ALL Notes'
+  if (title === 'ALL Notes') {
+    return {
+      error: 'RESERVED_TITLE',
+      folder: null,
+    };
+  }
+
   // Check if a folder with the same title already exists for this user
   const existingFolder = await Folder.findOne({
     where: { userId, title },
@@ -58,6 +66,14 @@ export const updateFolderService = async (
 
   // Check if title is being updated and if it conflicts with another folder
   if (title !== undefined && title !== folder.title) {
+    // Prevent updating folder to the reserved name 'ALL Notes'
+    if (title === 'ALL Notes') {
+      return {
+        error: 'RESERVED_TITLE',
+        folder: null,
+      };
+    }
+
     const existingFolder = await Folder.findOne({
       where: {
         userId,

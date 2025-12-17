@@ -14,6 +14,15 @@ export const createFolder = async (req: Request, res: Response): Promise<void> =
 
     const result = await createFolderService(userId!, title);
 
+    // Handle reserved title error
+    if (result.error === 'RESERVED_TITLE') {
+      res.status(400).json({
+        success: false,
+        message: '"ALL Notes" is a reserved folder name and cannot be used',
+      });
+      return;
+    }
+
     // Handle duplicate title error
     if (result.error === 'DUPLICATE_TITLE') {
       res.status(409).json({
@@ -96,6 +105,15 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
       res.status(404).json({
         success: false,
         message: 'Folder not found',
+      });
+      return;
+    }
+
+    // Handle reserved title error
+    if (result.error === 'RESERVED_TITLE') {
+      res.status(400).json({
+        success: false,
+        message: '"ALL Notes" is a reserved folder name and cannot be used',
       });
       return;
     }

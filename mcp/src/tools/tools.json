@@ -2,7 +2,7 @@
   "tools": [
     {
       "name": "create-note",
-      "description": "Tool call that creates a new note in the system. Use carefully with #tags and [[links]].",
+      "description": "Tool call that creates a new note in the system. Use carefully with #tags and [[links]]. Notes created without a folder will appear in 'All Notes'.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -16,7 +16,7 @@
           },
           "folderId": {
             "type": "number",
-            "description": "Optional folder ID to place the note in. Use only if known."
+            "description": "Optional folder ID to place the note in. If not provided, note will be created without a folder (accessible from All Notes)."
           }
         },
         "required": ["title"]
@@ -24,7 +24,7 @@
     },
     {
       "name": "update-note",
-      "description": "Updates an existing note using its ID.",
+      "description": "Updates an existing note using its ID. Can move notes between folders or to 'All Notes' view.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -41,8 +41,8 @@
             "description": "Optional new content"
           },
           "folderId": {
-            "type": "number",
-            "description": "Optional new folder ID"
+            "type": ["number", "string", "null"],
+            "description": "Optional new folder ID (number), or 'ALL Notes' (string) to remove from folder and show in All Notes view, or null to remove from folder"
           }
         },
         "required": ["noteId"]
@@ -77,13 +77,13 @@
     },
      {
   "name": "create-folder",
-  "description": "Creates a new folder with a title.",
+  "description": "Creates a new folder with a title. Note: 'ALL Notes' is a reserved name and cannot be used for folders.",
   "parameters": {
     "type": "object",
     "properties": {
       "title": {
         "type": "string",
-        "description": "The title of the new folder."
+        "description": "The title of the new folder. Cannot be 'ALL Notes' (reserved name)."
       }
     },
     "required": ["title"]

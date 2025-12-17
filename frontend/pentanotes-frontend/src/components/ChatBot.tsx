@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User } from '../types';
+import { User, Note } from '../types';
+import { RotateCcw } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface Message {
@@ -7,19 +8,30 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  requestId?: string; // Store requestId for bot messages for revert functionality
 }
 
 interface ChatBotProps {
   user: User;
   onNotesChanged?: () => Promise<void>;
   onFoldersChanged?: () => Promise<void>;
+  selectedNoteId?: number;
+  onSelectedNoteUpdated?: (note: Note) => void;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ user, onNotesChanged, onFoldersChanged }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({
+  user,
+  onNotesChanged,
+  onFoldersChanged,
+  selectedNoteId,
+  onSelectedNoteUpdated,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const [lastRequestId, setLastRequestId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -29,6 +41,58 @@ export const ChatBot: React.FC<ChatBotProps> = ({ user, onNotesChanged, onFolder
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleRevertLastAction = async () => {
+    // Extra safety check - don't allow if there's no requestId
+    if (!lastRequestId || !user.id || isReverting || isLoading) return;
+
+    setIsReverting(true);
+
+    try {
+      const response = await apiService.revertAiRequest(lastRequestId, user.id);
+
+      // Add revert notification message
+      const revertMessage: Message = {
+        id: `revert-${Date.now()}`,
+        text: `✓ Successfully reverted ${response.data.operationsReverted} action(s)`,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, revertMessage]);
+      // Clear the request ID so button disappears
+      setLastRequestId(null);
+
+      // Refresh notes and folders after revert
+      if (onNotesChanged) {
+        await onNotesChanged();
+        // If a note is currently selected, refresh it
+        if (selectedNoteId && onSelectedNoteUpdated) {
+          try {
+            const updatedNote = await apiService.getNoteById(selectedNoteId);
+            onSelectedNoteUpdated(updatedNote);
+          } catch (err) {
+            console.error('Failed to refresh selected note:', err);
+          }
+        }
+      }
+      if (onFoldersChanged) {
+        await onFoldersChanged();
+      }
+    } catch (error) {
+      const errorMessage: Message = {
+        id: `revert-error-${Date.now()}`,
+        text: `Failed to revert: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        sender: 'bot',
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+      console.error('Revert error:', error);
+    } finally {
+      setIsReverting(false);
+    }
+  };
 
   const handleSendMessage = async () => {
     const trimmedMessage = inputValue.trim();
@@ -69,14 +133,33 @@ export const ChatBot: React.FC<ChatBotProps> = ({ user, onNotesChanged, onFolder
         text: response.data || response.message || 'No response from server',
         sender: 'bot',
         timestamp: new Date(),
+        requestId: response.requestId, // Store requestId for potential revert
       };
 
       setMessages((prev) => [...prev, botMessage]);
+
+      // Store the last request ID for revert functionality
+      // Only set if there's an actual request ID (from AI actions)
+      // Clear it if the response doesn't have a requestId
+      if (response.requestId) {
+        setLastRequestId(response.requestId);
+      } else {
+        setLastRequestId(null);
+      }
 
       // Handle data refresh based on changed field
       if (response.changed && Array.isArray(response.changed)) {
         if (response.changed.includes('notes') && onNotesChanged) {
           await onNotesChanged();
+          // If a note is currently selected, refresh it
+          if (selectedNoteId && onSelectedNoteUpdated) {
+            try {
+              const updatedNote = await apiService.getNoteById(selectedNoteId);
+              onSelectedNoteUpdated(updatedNote);
+            } catch (err) {
+              console.error('Failed to refresh selected note:', err);
+            }
+          }
         }
         if (response.changed.includes('folders') && onFoldersChanged) {
           await onFoldersChanged();
@@ -156,25 +239,43 @@ export const ChatBot: React.FC<ChatBotProps> = ({ user, onNotesChanged, onFolder
                 <p className="text-xs text-white/80">Always here to help</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-white/80 hover:text-white transition-colors"
-              aria-label="Close chat"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center space-x-2">
+              {lastRequestId && (
+                <button
+                  onClick={handleRevertLastAction}
+                  disabled={isReverting || isLoading}
+                  title="Undo last AI action"
+                  className={`flex items-center space-x-1 px-3 py-1 rounded-full transition-all duration-200 font-medium text-sm ${
+                    isReverting
+                      ? 'bg-white/20 text-white cursor-not-allowed opacity-60'
+                      : 'bg-white/30 text-white hover:bg-white/40 active:bg-white/50 hover:shadow-md'
+                  }`}
+                  aria-label="Revert last action"
+                >
+                  <RotateCcw className={`w-4 h-4 ${isReverting ? 'animate-spin' : ''}`} />
+                  <span>Undo</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-white/80 hover:text-white transition-colors"
+                aria-label="Close chat"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Messages */}

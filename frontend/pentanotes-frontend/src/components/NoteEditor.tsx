@@ -7,9 +7,9 @@ import { apiService } from '../services/api';
 interface NoteEditorProps {
   note: Note | null;
   folders: Folder[];
-  onUpdate: (id: number, title: string, content: string, folderId?: number | null) => Promise<Note>;
+  onUpdate: (id: number, title: string, content: string, folderId?: number | null | 'ALL Notes') => Promise<Note>;
   onDelete: (id: number) => void;
-  onLinkClick: (linkName: string, noteId: number, title: string, content: string, folderId: number | null) => Promise<void>;
+  onLinkClick: (linkName: string, noteId: number, title: string, content: string, folderId: number | null | 'ALL Notes') => Promise<void>;
   onTagClick?: (tagName: string) => void;
   allNotes: Note[];
 }
@@ -73,17 +73,21 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     }
     setIsEditing(false);
   };
-  const handleFolderChange = async (event: React.ChangeEvent<HTMLSelectElement>) => { ///LJDHGLKUDSGHJ
+  const handleFolderChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (!note) return;
     const value = event.target.value;
-    const nextFolderId = value ? parseInt(value, 10) : null;
-    if ((note.folderId ?? null) === nextFolderId) {
+    // Convert to folder ID (number) or null for no folder
+    const nextFolderId: number | null = value ? parseInt(value, 10) : null;
+    
+    // Compare with current note's folderId
+    const currentFolderId: number | null = note.folderId ?? null;
+    if (currentFolderId === nextFolderId) {
       setFolderId(nextFolderId);
       return;
     }
     setFolderId(nextFolderId);
     try {
-      await await onUpdate(note.id, title, content, nextFolderId);
+      await onUpdate(note.id, title, content, nextFolderId);
     } catch (err) {
       console.error('Failed to move note:', err);
       setFolderId(note.folderId ?? null);
@@ -228,7 +232,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <FolderIcon className="w-4 h-4 text-gray-500" />
             <select
-              value={folderId ?? ''}
+              value={folderId !== null ? folderId : ''}
               onChange={handleFolderChange}
               className="border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
             >

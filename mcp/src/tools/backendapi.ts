@@ -68,12 +68,18 @@ async function apiRequest<T = any>(
 export async function createNote(
   title: string,
   content: string,
-  token: string
+  token: string,
+  folderId?: number | null
 ): Promise<ApiResponse> {
+  const body: Record<string, any> = { title, content };
+  // Don't include folderId if undefined - backend defaults to null
+  if (folderId !== undefined) {
+    body.folderId = folderId;
+  }
   return apiRequest('/api/notes/', {
     method: 'POST',
     token,
-    body: { title, content },
+    body,
   });
 }
 
@@ -85,7 +91,7 @@ export async function updateNote(
   updates: {
     title?: string;
     content?: string;
-    folderId?: number;
+    folderId?: number | null | 'ALL Notes';
   },
   token: string
 ): Promise<ApiResponse> {
@@ -143,3 +149,45 @@ export async function createFolder(
   });
 }
 
+/**
+ * Deletes a note
+ */
+export async function deleteNote(noteId: number, token: string): Promise<ApiResponse> {
+  return apiRequest(`/api/notes/${noteId}/`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+/**
+ * Deletes a folder
+ */
+export async function deleteFolder(folderId: number, token: string): Promise<ApiResponse> {
+  return apiRequest(`/api/folders/${folderId}/`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+/**
+ * Fetches a note by ID
+ */
+export async function getNoteById(noteId: number, token: string): Promise<ApiResponse> {
+  return apiRequest(`/api/notes/${noteId}/`, {
+    method: 'GET',
+    token,
+  });
+}
+
+/**
+ * Fetches a folder by ID
+ */
+export async function getFolderById(
+  folderId: number,
+  token: string
+): Promise<ApiResponse> {
+  return apiRequest(`/api/folders/${folderId}/`, {
+    method: 'GET',
+    token,
+  });
+}

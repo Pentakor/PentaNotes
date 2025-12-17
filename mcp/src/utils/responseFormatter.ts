@@ -9,6 +9,7 @@ export interface ApiResponse<T = any> {
   message: string;
   data?: T;
   changed?: string[];
+  requestId?: string;
   error?: string;
 }
 
@@ -23,9 +24,10 @@ export function sendSuccess<T>(
   data: T,
   message: string = 'Success',
   statusCode: number = 200,
-  changed?: string[]
+  changed?: string[],
+  requestId?: string
 ): Response {
-  logger.debug('Sending success response', { statusCode });
+  logger.debug('Sending success response', { statusCode, requestId });
   const response: any = {
     status: 'success',
     message,
@@ -33,6 +35,9 @@ export function sendSuccess<T>(
   };
   if (changed && changed.length > 0) {
     response.changed = changed;
+  }
+  if (requestId) {
+    response.requestId = requestId;
   }
   return res.status(statusCode).json(response);
 }

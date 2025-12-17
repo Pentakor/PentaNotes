@@ -114,7 +114,8 @@ class ApiService {
 
   async createNote(title: string, content: string, folderId?: number | null): Promise<Note> {
     const payload: Record<string, unknown> = { title, content };
-    if (folderId !== undefined && folderId !== null) {
+    // Don't include folderId if undefined - backend defaults to null
+    if (folderId !== undefined) {
       payload.folderId = folderId;
     }
 
@@ -143,9 +144,9 @@ class ApiService {
     return response.data?.note || response.data || response;
   }
 
-  async updateNote(id: number, title: string, content: string, folderId?: number | null): Promise<Note> {
+  async updateNote(id: number, title: string, content: string, folderId?: number | null | 'ALL Notes'): Promise<Note> {
     const payload: Record<string, unknown> = { title, content };
-    // Include folderId if it's explicitly passed (including null to remove from folder)
+    // Include folderId if it's explicitly passed (including null or "ALL Notes" to remove from folder)
     if (folderId !== undefined) {
       payload.folderId = folderId;
     }
@@ -294,7 +295,7 @@ class ApiService {
     return response.data?.notes || response.notes || response.data || response;
   }
 
-  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string; changed?: string[] }> {
+  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string; changed?: string[]; requestId?: string }> {
   const res = await fetch('http://localhost:8080/mcp', {
     method: 'POST',
     headers: this.getHeaders(true), // This includes the Bearer token
@@ -308,6 +309,36 @@ class ApiService {
   const response = await res.json();
   return response;
 }
+
+  async revertAiRequest(requestId: string, userId: number): Promise<{ status: string; message: string; data: { operationsReverted: number; message: string } }> {
+    const res = await fetch('http://localhost:8080/mcp/revert', {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ requestId, userId }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || 'Failed to revert request');
+    }
+
+    const response = await res.json();
+    return response;
+  }
+
+  async getRequestStatus(requestId: string, userId: number): Promise<{ status: string; message: string; data: { status: string; message: string; actionCount?: number; revertedAt?: string } }> {
+    const res = await fetch(`http://localhost:8080/mcp/status/${requestId}?userId=${userId}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch request status');
+    }
+
+    const response = await res.json();
+    return response;
+  }
 }
 
 export const apiService = new ApiService();

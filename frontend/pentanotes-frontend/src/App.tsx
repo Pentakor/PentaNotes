@@ -145,6 +145,15 @@ const App = () => {
         if (!folderTitle) {
           return;
         }
+        // Prevent creating folders with reserved name
+        if (folderTitle === 'ALL Notes') {
+          showModal({
+            type: 'error',
+            title: 'Invalid Folder Name',
+            message: '"ALL Notes" is a reserved folder name and cannot be used',
+          });
+          throw new Error('"ALL Notes" is a reserved folder name');
+        }
         try {
           const folder = await createFolder(folderTitle);
           setSelectedFolderId(folder.id);
@@ -178,6 +187,15 @@ const App = () => {
         const folderTitle = value?.trim();
         if (!folderTitle || folderTitle === folder?.title) {
           return;
+        }
+        // Prevent renaming to reserved name
+        if (folderTitle === 'ALL Notes') {
+          showModal({
+            type: 'error',
+            title: 'Invalid Folder Name',
+            message: '"ALL Notes" is a reserved folder name and cannot be used',
+          });
+          throw new Error('"ALL Notes" is a reserved folder name');
         }
         try {
           await updateFolder(folderId, { title: folderTitle });
@@ -247,7 +265,7 @@ const App = () => {
     id: number,
     title: string,
     content: string,
-    folderId?: number | null
+    folderId?: number | null | 'ALL Notes'
   ) => {
     try {
       const updatedNote = await updateNote(id, title, content, folderId);
@@ -293,7 +311,7 @@ const App = () => {
     noteId: number,
     title: string,
     content: string,
-    folderId: number | null
+    folderId: number | null | 'ALL Notes'
   ) => {
     try {
       // First, save the current note with its current state
@@ -383,7 +401,20 @@ const App = () => {
       />
 
       {/* ChatBot - only shows when user is logged in */}
-      {user && <ChatBot user={user} onNotesChanged={refreshNotes} onFoldersChanged={refreshFolders} />}
+      {user && (
+        <ChatBot
+          user={user}
+          onNotesChanged={refreshNotes}
+          onFoldersChanged={refreshFolders}
+          selectedNoteId={selectedNote?.id}
+          onSelectedNoteUpdated={(updatedNote) => {
+            // Update the selected note when AI makes changes to it
+            if (selectedNote && updatedNote.id === selectedNote.id) {
+              setSelectedNote(updatedNote);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

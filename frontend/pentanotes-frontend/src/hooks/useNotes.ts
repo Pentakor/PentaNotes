@@ -71,7 +71,7 @@ export const useNotes = (
     id: number,
     title: string,
     content: string,
-    nextFolderId?: number | null
+    nextFolderId?: number | null | 'ALL Notes'
   ) => {
     try {
       const updatedNote = await apiService.updateNote(id, title, content, nextFolderId);

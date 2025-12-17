@@ -18,3 +18,16 @@ export const mcpSchema = z.object({
 
 // Infer the TypeScript type from the schema for use in controllers
 export type McpRequestBody = z.infer<typeof mcpSchema>;
+
+// Schema for revert request
+export const revertSchema = z.object({
+  requestId: z.string({
+    message: "Request ID must be a string",
+  }).min(1, "Request ID cannot be empty"),
+  
+  userId: z.number({
+    message: "User ID must be a number",
+  }).int("User ID must be an integer"),
+});
+
+export type RevertRequestBody = z.infer<typeof revertSchema>;

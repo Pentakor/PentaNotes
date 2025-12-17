@@ -8,7 +8,7 @@ interface NoteAttributes {
   content: string;
   createdAt?: Date;
   updatedAt?: Date;
-  folderId?: number;
+  folderId?: number | null;
 }
 
 interface NoteCreationAttributes extends Optional<NoteAttributes, 'id'> {}
@@ -18,7 +18,7 @@ class Note extends Model<NoteAttributes, NoteCreationAttributes> implements Note
   public userId!: number;
   public title!: string;
   public content!: string;
-  public folderId?: number;
+  public folderId?: number | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;

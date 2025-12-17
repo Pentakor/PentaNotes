@@ -250,7 +250,7 @@ export const createNoteService = async (
         userId,
         title,
         content: content || '',
-        folderId: folderId || undefined,
+        folderId: folderId ?? null,
       },
       { transaction: t }
     );
@@ -320,7 +320,7 @@ export const getNoteByIdService = async (userId: number, noteId: number) => {
 export const updateNoteService = async (
   userId: number,
   noteId: number,
-  updates: { title?: string; content?: string; folderId?: number | null }
+  updates: { title?: string; content?: string; folderId?: number | null | 'ALL Notes' }
 ) => {
   const t = await sequelize.transaction();
   try {
@@ -357,7 +357,14 @@ export const updateNoteService = async (
       note.title = title;
     }
 
-    if (folderId !== undefined) note.folderId = folderId ?? undefined;
+    if (folderId !== undefined) {
+      // Convert 'ALL Notes' string to null to remove note from folder
+      if (folderId === 'ALL Notes' || folderId === null) {
+        note.folderId = null;
+      } else {
+        note.folderId = folderId;
+      }
+    }
     if (content !== undefined) note.content = content;
     await note.save({ transaction: t });
 
