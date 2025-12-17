@@ -50,6 +50,12 @@ docker-compose up -d
 Access the app:
 - **Frontend**: http://localhost:3000
 
+Sign Up:
+
+Enter your email,
+your password (should be at least 6 characters, for test you may try "password")  
+and your name.
+
 ## Architecture Overview
 
 | Service | Tech | Port | Purpose |
