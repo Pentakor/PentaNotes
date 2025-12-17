@@ -294,7 +294,7 @@ class ApiService {
     return response.data?.notes || response.notes || response.data || response;
   }
 
-  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string }> {
+  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string; changed?: string[] }> {
   const res = await fetch('http://localhost:8080/mcp', {
     method: 'POST',
     headers: this.getHeaders(true), // This includes the Bearer token

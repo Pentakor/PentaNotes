@@ -9,6 +9,30 @@ import { ConversationHistoryService } from '../database/conversationHistoryModel
 // ---------------------------
 // AI Generation Loop
 // ---------------------------
+
+/**
+ * Track which entities were changed by tools
+ */
+export interface AIResponseWithChanges {
+  response: string;
+  changed: string[];
+}
+
+/**
+ * Get changed entity type based on tool name
+ */
+function getChangedEntityFromTool(toolName: string): string | null {
+  const toolToEntityMap: Record<string, string> = {
+    'create-note': 'notes',
+    'update-note': 'notes',
+    'delete-note': 'notes',
+    'create-folder': 'folders',
+    'update-folder': 'folders',
+    'delete-folder': 'folders',
+  };
+  return toolToEntityMap[toolName] || null;
+}
+
 /**
  * Run the AI generation loop with tool calling
  */
@@ -16,11 +40,12 @@ export async function generateAIResponse(
   contents: Content[],
   token: string | null,
   userId: number
-): Promise<string> {
+): Promise<AIResponseWithChanges> {
   const ai = aiClientFactory.getClient();
   const model = aiClientFactory.getModelName();
   const tools = toolRegistry.toSDKFormat();
   const systemPrompt = promptLoader.loadSystemPrompt();
+  const changedEntities = new Set<string>(); // Track changed entities
 
   logger.debug('Starting AI generation loop', {
     userId,
@@ -54,6 +79,12 @@ export async function generateAIResponse(
       }
 
       logger.info(`AI calling tool: ${name}`, { toolName: name, userId });
+
+      // Track if this tool modifies data
+      const changedEntity = getChangedEntityFromTool(name);
+      if (changedEntity) {
+        changedEntities.add(changedEntity);
+      }
 
       // Execute the tool
       let toolResponse: any;
@@ -89,14 +120,19 @@ export async function generateAIResponse(
 
       logger.debug(`Tool response added to conversation`, { toolName: name });
     } else {
-      // No more function calls, return final response
+      // No more function calls, return final response with changes tracked
       const response = result.text || 'No response generated';
+      const changed = Array.from(changedEntities);
       logger.info(`AI generation completed`, {
         userId,
         responseLength: response.length,
         loopCount,
+        changedEntities: changed,
       });
-      return response;
+      return {
+        response,
+        changed,
+      };
     }
   }
 

@@ -25,7 +25,7 @@ const App = () => {
   const { token, user, loading: authLoading, register, login, logout } = useAuth();
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
-  const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
+  const { folders, createFolder, updateFolder, deleteFolder, refreshFolders } = useFolders(token);
   const { tags, loading: tagsLoading, refreshTags } = useTags(token);
 
   const selectedTagName = useMemo(() => {
@@ -35,7 +35,7 @@ const App = () => {
     return tags.find((tag) => tag.id === selectedTagId)?.name ?? null;
   }, [selectedTagId, tags]);
 
-  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(
+  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote, refreshNotes } = useNotes(
     token,
     selectedFolderId,
     selectedTagName
@@ -382,7 +382,7 @@ const App = () => {
       />
 
       {/* ChatBot - only shows when user is logged in */}
-      {user && <ChatBot user={user} />}
+      {user && <ChatBot user={user} onNotesChanged={refreshNotes} onFoldersChanged={refreshFolders} />}
     </div>
   );
 };

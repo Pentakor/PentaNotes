@@ -2,11 +2,12 @@ import { Router, Request, Response } from 'express';
 import { McpRequestBody, mcpSchema } from '../schemas/mcpSchema';
 import { validate } from '../middleware/validation';
 import { extractBearerToken } from '../helpers/tokenextraction';
-import { getConversationHistory, addToConversationHistory } from '../helpers/conversationHistory';
+import { ConversationHistoryService } from '../database/conversationHistoryModel';
 import { generateAIResponse } from '../utils/aiGenerator';
 import { sendSuccess, sendError } from '../utils/responseFormatter';
 import { logger } from '../utils/logger';
 import { Content } from '../types/content';
+import { MAX_HISTORY_MESSAGES } from '../config/env';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.post(
 
     try {
       // Get conversation history from database
-      const history = userId ? await getConversationHistory(userId) : [];
+      const history = userId ? await ConversationHistoryService.getHistory(userId) : [];
 
       // Build conversation contents
       const contents: Content[] = [
@@ -36,17 +37,20 @@ router.post(
       ];
 
       // Generate AI response with tool calling
-      const aiResponse = await generateAIResponse(contents, token, userId);
+      const { response, changed } = await generateAIResponse(contents, token, userId);
 
       // Store in database
-      await addToConversationHistory(userId, message, aiResponse);
+      if (userId) {
+        await ConversationHistoryService.addToHistory(userId, message, response, MAX_HISTORY_MESSAGES);
+      }
 
       // Send success response
       return sendSuccess(
         res,
-        aiResponse,
+        response,
         'AI processed the request successfully.',
-        200
+        200,
+        changed
       );
     } catch (error) {
       logger.error(

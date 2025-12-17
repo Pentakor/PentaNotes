@@ -11,9 +11,11 @@ interface Message {
 
 interface ChatBotProps {
   user: User;
+  onNotesChanged?: () => Promise<void>;
+  onFoldersChanged?: () => Promise<void>;
 }
 
-export const ChatBot: React.FC<ChatBotProps> = ({ user }) => {
+export const ChatBot: React.FC<ChatBotProps> = ({ user, onNotesChanged, onFoldersChanged }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -70,6 +72,16 @@ export const ChatBot: React.FC<ChatBotProps> = ({ user }) => {
       };
 
       setMessages((prev) => [...prev, botMessage]);
+
+      // Handle data refresh based on changed field
+      if (response.changed && Array.isArray(response.changed)) {
+        if (response.changed.includes('notes') && onNotesChanged) {
+          await onNotesChanged();
+        }
+        if (response.changed.includes('folders') && onFoldersChanged) {
+          await onFoldersChanged();
+        }
+      }
     } catch (error) {
       // Add error message
       const errorMessage: Message = {
