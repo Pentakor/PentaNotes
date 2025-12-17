@@ -123,6 +123,13 @@ export async function getNotes(token: string): Promise<ApiResponse> {
 }
 
 /**
+ * Fetches note names (id and title) for the authenticated user
+ */
+export async function getNoteNames(token: string): Promise<ApiResponse> {
+  return apiRequest('/api/notes/names', { token });
+}
+
+/**
  * Creates a new folder
  */
 export async function createFolder(

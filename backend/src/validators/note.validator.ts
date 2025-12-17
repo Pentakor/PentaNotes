@@ -15,7 +15,7 @@ export const updateNoteSchema = z.object({
   body: z.object({
     title: z.string().min(1, 'Title is required').max(255, 'Title too long').optional(),
     content: z.string().optional(),
-    folderId: z.number().optional(),
+    folderId: z.number().nullable().optional(),
   }),
 });
 

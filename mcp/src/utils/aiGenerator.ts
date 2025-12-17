@@ -39,18 +39,21 @@ function getChangedEntityFromTool(toolName: string): string | null {
 export async function generateAIResponse(
   contents: Content[],
   token: string | null,
-  userId: number
+  userId: number,
+  ragContext: string = ''
 ): Promise<AIResponseWithChanges> {
   const ai = aiClientFactory.getClient();
   const model = aiClientFactory.getModelName();
   const tools = toolRegistry.toSDKFormat();
-  const systemPrompt = promptLoader.loadSystemPrompt();
+  const baseSystemPrompt = promptLoader.loadSystemPrompt();
+  const systemPrompt = ragContext ? `${baseSystemPrompt}${ragContext}` : baseSystemPrompt;
   const changedEntities = new Set<string>(); // Track changed entities
 
   logger.debug('Starting AI generation loop', {
     userId,
     contentCount: contents.length,
     toolCount: tools[0].functionDeclarations.length,
+    hasRagContext: !!ragContext,
   });
 
   let loopCount = 0;

@@ -7,6 +7,7 @@ import {
   getNotesService,
   getTagsFromContent,
   getNotesByTagIdService,
+  getNoteNamesService,
   updateNoteService,
 } from '../services/note.service';
 
@@ -218,6 +219,27 @@ export const getNotesByTagId = async (req: Request, res: Response): Promise<void
     res.status(500).json({
       success: false,
       message: 'Error fetching notes for tag',
+    });
+  }
+};
+
+// GET NOTE NAMES
+export const getNoteNames = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    const noteNames = await getNoteNamesService(userId!);
+
+    res.status(200).json({
+      success: true,
+      data: { notes: noteNames },
+    });
+
+  } catch (error) {
+    console.error('Get note names error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching note names',
     });
   }
 };

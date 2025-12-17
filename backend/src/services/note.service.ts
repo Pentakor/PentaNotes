@@ -288,6 +288,17 @@ export const getNotesService = async (userId: number) => {
   return notesWithLinks;
 };
 
+export const getNoteNamesService = async (userId: number) => {
+  const notes = await Note.findAll({
+    where: { userId },
+    attributes: ['id', 'title'],
+    order: [['title', 'ASC']],
+    raw: true,
+  });
+
+  return notes;
+};
+
 export const getNotesByFolderIdService = async (userId: number, folderId: number) => {
   const notes = await Note.findAll({
     where: { folderId, userId },

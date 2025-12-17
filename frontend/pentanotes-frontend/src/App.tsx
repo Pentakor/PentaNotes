@@ -231,6 +231,7 @@ const App = () => {
             setSelectedNote(null);
           }
           await refreshTags();
+          await refreshNotes();
         } catch (err) {
           showModal({
             type: 'error',
