@@ -80,7 +80,7 @@ router.post(
       ];
 
       // Generate AI response with tool calling
-      const { response, changed, requestId } = await generateAIResponse(contents, token, userId, ragContext);
+      const { response, changed, requestId, actionCount } = await generateAIResponse(contents, token, userId, ragContext);
 
       // Store in database
       if (userId) {
@@ -94,7 +94,8 @@ router.post(
         'AI processed the request successfully.',
         200,
         changed,
-        requestId
+        requestId,
+        actionCount
       );
     } catch (error) {
       logger.error(

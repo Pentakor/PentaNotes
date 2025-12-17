@@ -10,7 +10,35 @@ export interface ApiResponse<T = any> {
   data?: T;
   changed?: string[];
   requestId?: string;
-  error?: string;
+  actionCount?: number;
+  error?: string | Record<string, any>;
+}
+
+// ---------------------------
+// Helper: Extract clean error message
+// ---------------------------
+function extractErrorMessage(error: string | Error): string {
+  let errorMessage = error instanceof Error ? error.message : String(error);
+
+  // If the error message is a JSON string (from nested errors), try to parse it
+  try {
+    if (errorMessage.startsWith('{')) {
+      const parsed = JSON.parse(errorMessage);
+      // Extract the most relevant error message
+      if (typeof parsed === 'object' && parsed !== null) {
+        if (parsed.error?.message) {
+          return parsed.error.message;
+        }
+        if (parsed.message) {
+          return parsed.message;
+        }
+      }
+    }
+  } catch {
+    // If parsing fails, just use the original message
+  }
+
+  return errorMessage;
 }
 
 // ---------------------------
@@ -25,9 +53,10 @@ export function sendSuccess<T>(
   message: string = 'Success',
   statusCode: number = 200,
   changed?: string[],
-  requestId?: string
+  requestId?: string,
+  actionCount?: number
 ): Response {
-  logger.debug('Sending success response', { statusCode, requestId });
+  logger.debug('Sending success response', { statusCode, requestId, actionCount });
   const response: any = {
     status: 'success',
     message,
@@ -38,6 +67,9 @@ export function sendSuccess<T>(
   }
   if (requestId) {
     response.requestId = requestId;
+  }
+  if (actionCount !== undefined) {
+    response.actionCount = actionCount;
   }
   return res.status(statusCode).json(response);
 }
@@ -51,8 +83,8 @@ export function sendError(
   error: string | Error,
   statusCode: number = 500
 ): Response {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  logger.debug('Sending error response', { statusCode, message });
+  const errorMessage = extractErrorMessage(error);
+  logger.debug('Sending error response', { statusCode, message, errorMessage });
   return res.status(statusCode).json({
     status: 'error',
     message,

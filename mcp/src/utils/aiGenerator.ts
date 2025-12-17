@@ -19,6 +19,7 @@ export interface AIResponseWithChanges {
   response: string;
   changed: string[];
   requestId: string;
+  actionCount: number;
 }
 
 /**
@@ -154,6 +155,7 @@ export async function generateAIResponse(
           response,
           changed,
           requestId,
+          actionCount: changedEntities.size,
         };
       }
     }

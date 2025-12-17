@@ -97,6 +97,14 @@ const App = () => {
     }
   }, [selectedTagId, tags, token]);
 
+  // Check if selected note still exists in the allNotes list
+  // This handles cases where a note was deleted (e.g., via AI revert)
+  useEffect(() => {
+    if (selectedNote && !allNotes.some((note) => note.id === selectedNote.id)) {
+      setSelectedNote(null);
+    }
+  }, [allNotes, selectedNote]);
+
   const handleFolderSelect = (folderId: number | null) => {
     setSelectedFolderId(folderId);
     setSelectedTagId(null);

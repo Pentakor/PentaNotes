@@ -319,10 +319,16 @@ class ApiService {
 
     if (!res.ok) {
       const error = await res.json();
-      throw new Error(error.error || 'Failed to revert request');
+      throw new Error(error.error || error.message || 'Failed to revert request');
     }
 
     const response = await res.json();
+    
+    // Validate response structure
+    if (!response.data || typeof response.data.operationsReverted !== 'number') {
+      throw new Error('Invalid revert response format');
+    }
+    
     return response;
   }
 

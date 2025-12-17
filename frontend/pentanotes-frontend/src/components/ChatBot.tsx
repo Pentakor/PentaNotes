@@ -52,9 +52,10 @@ export const ChatBot: React.FC<ChatBotProps> = ({
       const response = await apiService.revertAiRequest(lastRequestId, user.id);
 
       // Add revert notification message
+      const operationsCount = response.data?.operationsReverted ?? 0;
       const revertMessage: Message = {
         id: `revert-${Date.now()}`,
-        text: `✓ Successfully reverted ${response.data.operationsReverted} action(s)`,
+        text: `✓ Successfully reverted ${operationsCount} action(s)`,
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -66,13 +67,17 @@ export const ChatBot: React.FC<ChatBotProps> = ({
       // Refresh notes and folders after revert
       if (onNotesChanged) {
         await onNotesChanged();
-        // If a note is currently selected, refresh it
+        // After refreshing the notes list, if a note is currently selected,
+        // try to refresh its content. If it was deleted, the note will no longer
+        // be in the list and the parent component should handle deselection
         if (selectedNoteId && onSelectedNoteUpdated) {
           try {
             const updatedNote = await apiService.getNoteById(selectedNoteId);
             onSelectedNoteUpdated(updatedNote);
           } catch (err) {
-            console.error('Failed to refresh selected note:', err);
+            // Note was deleted during revert - the parent component should have
+            // already deselected it through the onNotesChanged callback
+            console.log('Selected note no longer exists after revert');
           }
         }
       }
@@ -139,9 +144,9 @@ export const ChatBot: React.FC<ChatBotProps> = ({
       setMessages((prev) => [...prev, botMessage]);
 
       // Store the last request ID for revert functionality
-      // Only set if there's an actual request ID (from AI actions)
-      // Clear it if the response doesn't have a requestId
-      if (response.requestId) {
+      // Only set if there's an actual request ID AND actual changes were made
+      // The UNDO button should only appear if the AI actually performed actions
+      if (response.requestId && response.changed && response.changed.length > 0) {
         setLastRequestId(response.requestId);
       } else {
         setLastRequestId(null);
