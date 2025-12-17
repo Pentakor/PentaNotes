@@ -6,7 +6,7 @@ A full-stack note-taking app with an intelligent AI assistant (powered by Google
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/PentaNotes.git
+git clone https://github.com/pentakor/PentaNotes.git
 cd PentaNotes
 ```
 
