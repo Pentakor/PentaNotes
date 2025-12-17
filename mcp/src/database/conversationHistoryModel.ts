@@ -34,6 +34,9 @@ const ConversationHistorySchema = new Schema<IConversationHistory>(
   }
 );
 
+// Add TTL index to automatically expire documents 30 minutes after creation
+ConversationHistorySchema.index({ createdAt: 1 }, { expireAfterSeconds: 1800 });
+
 // ---------------------------
 // Model
 // ---------------------------
