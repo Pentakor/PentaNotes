@@ -12,12 +12,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onRegister, loadi
   const [showAuth, setShowAuth] = useState<'login' | 'register' | null>(null);
 
   const handleAuthSubmit = async (data: AuthFormData) => {
-    if (showAuth === 'login') {
-      await onLogin({ email: data.email, password: data.password });
-    } else {
-      await onRegister(data);
+    try {
+      if (showAuth === 'login') {
+        await onLogin({ email: data.email, password: data.password });
+      } else {
+        await onRegister(data);
+      }
+      setShowAuth(null);
+    } catch (err) {
+      console.error('Authentication failed:', err);
     }
-    setShowAuth(null);
   };
 
   return (

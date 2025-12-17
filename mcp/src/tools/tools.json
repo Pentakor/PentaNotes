@@ -1,0 +1,95 @@
+{
+  "tools": [
+    {
+      "name": "create-note",
+      "description": "Tool call that creates a new note in the system. Use carefully with #tags and [[links]]. Notes created without a folder will appear in 'All Notes'.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Title of the note. MUST be provided."
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional content of the note. You can include #tags to create tags and [[links]] to link other notes."
+          },
+          "folderId": {
+            "type": "number",
+            "description": "Optional folder ID to place the note in. If not provided, note will be created without a folder (accessible from All Notes)."
+          }
+        },
+        "required": ["title"]
+      }
+    },
+    {
+      "name": "update-note",
+      "description": "Updates an existing note using its ID. Can move notes between folders or to 'All Notes' view.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "number",
+            "description": "ID of the note to update"
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional new title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Optional new content"
+          },
+          "folderId": {
+            "type": ["number", "string", "null"],
+            "description": "Optional new folder ID (number), or 'ALL Notes' (string) to remove from folder and show in All Notes view, or null to remove from folder"
+          }
+        },
+        "required": ["noteId"]
+      }
+    },
+    {
+      "name": "get-folders",
+      "description": "Returns all folders belonging to the user.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get-tags",
+      "description": "Returns all tags belonging to the user.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "get-notes",
+      "description": "Returns all notes belonging to the user.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+     {
+  "name": "create-folder",
+  "description": "Creates a new folder with a title. Note: 'ALL Notes' is a reserved name and cannot be used for folders.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "The title of the new folder. Cannot be 'ALL Notes' (reserved name)."
+      }
+    },
+    "required": ["title"]
+  }
+}
+   
+
+  ]
+}

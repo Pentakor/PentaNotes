@@ -1,18 +1,22 @@
 import React from 'react';
 import { Search, Plus, User, LogOut, FolderPlus, Folder as FolderIcon, Edit2, Trash2 } from 'lucide-react';
-import { Note, Folder, User as UserType } from '../types';
+import { Note, Folder, Tag, User as UserType } from '../types';
 
 interface SidebarProps {
   user: UserType | null;
   notes: Note[];
   folders: Folder[];
+  tags: Tag[];
   selectedNote: Note | null;
   selectedFolderId: number | null;
+  selectedTagId: number | null;
   searchQuery: string;
   notesLoading?: boolean;
+  tagsLoading?: boolean;
   onSearchChange: (query: string) => void;
   onNoteSelect: (note: Note) => void;
   onFolderSelect: (folderId: number | null) => void;
+  onTagSelect: (tagId: number | null) => void;
   onCreateNote: () => void;
   onCreateFolder: () => void;
   onRenameFolder: (folderId: number) => void;
@@ -24,13 +28,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   user,
   notes = [],
   folders = [],
+  tags = [],
   selectedNote,
   selectedFolderId,
+  selectedTagId,
   searchQuery,
   notesLoading = false,
+  tagsLoading = false,
   onSearchChange,
   onNoteSelect,
   onFolderSelect,
+  onTagSelect,
   onCreateNote,
   onCreateFolder,
   onRenameFolder,
@@ -150,6 +158,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ))
           )}
         </div>
+      </div>
+
+      {/* Tag Controls */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold uppercase text-gray-500 tracking-wide">Tags</p>
+          {tagsLoading && <span className="text-xs text-gray-400">Loading...</span>}
+        </div>
+        {tags.length === 0 && !tagsLoading ? (
+          <p className="text-xs text-gray-400 px-3 py-2">No tags yet</p>
+        ) : (
+          <div className="space-y-1">
+            <button
+              onClick={() => onTagSelect(null)}
+              className={`w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors ${
+                selectedTagId === null
+                  ? 'bg-green-50 text-green-700 font-semibold'
+                  : 'text-gray-700 hover:bg-green-50/80'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              All Tags
+            </button>
+            {tags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => onTagSelect(tag.id)}
+                className={`w-full px-3 py-2 rounded-lg flex items-center justify-between text-sm transition-colors ${
+                  selectedTagId === tag.id
+                    ? 'bg-green-100 text-green-800 font-semibold border border-green-200'
+                    : 'text-gray-700 hover:bg-green-50/80'
+                }`}
+              >
+                <span className="flex items-center gap-2 overflow-hidden">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="truncate">#{tag.name}</span>
+                </span>
+                <span className="text-xs text-gray-500">{tag.noteCount}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* New Note Button */}

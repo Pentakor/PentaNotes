@@ -15,14 +15,28 @@ export const AuthForm: React.FC<AuthFormProps> = ({ type, onSubmit, onCancel, lo
     password_confirm: '',
     name: '',
   });
+  const [error, setError] = useState<string>('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
+    // Validate password confirmation for registration
+    if (type === 'register' && formData.password !== formData.password_confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+
     await onSubmit(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
       <input
         type="email"
         placeholder="Email"

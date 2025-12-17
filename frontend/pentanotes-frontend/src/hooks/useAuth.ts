@@ -1,26 +1,70 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiService } from '../services/api';
 import { User, AuthFormData, LoginCredentials } from '../types';
 import { TOKEN_KEY } from '../config/constants';
+import { useModal } from '../contexts/ModalContext';
 
 export const useAuth = () => {
   const [token, setToken] = useState<string | null>(localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const { showError } = useModal();
+
+  const lastProfileToken = useRef<string | null>(null);
 
   useEffect(() => {
-    if (token) {
-      loadProfile();
+    if (!token) {
+      lastProfileToken.current = null;
+      setProfileLoading(false);
+      setUser(null);
+      return;
     }
+    if (lastProfileToken.current === token) {
+      return;
+    }
+    lastProfileToken.current = token;
+    void loadProfile(token);
   }, [token]);
 
-  const loadProfile = async () => {
+  const loadProfile = async (currentToken: string) => {
+    setProfileLoading(true);
     try {
       const profile = await apiService.getProfile();
       setUser(profile);
     } catch (err) {
       console.error('Failed to load profile:', err);
+      // Token is invalid, clear it
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+    } finally {
+      setProfileLoading(false);
     }
+  };
+
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error) {
+      try {
+        const parsed = JSON.parse(err.message);
+        if (typeof parsed === 'string') {
+          return parsed;
+        }
+        if (parsed && typeof parsed === 'object' && 'message' in parsed) {
+          const message = (parsed as { message?: unknown }).message;
+          if (typeof message === 'string') {
+            return message;
+          }
+        }
+      } catch {
+        // message was not JSON encoded, fall through
+      }
+      return err.message || fallback;
+    }
+    if (typeof err === 'object' && err && 'message' in err && typeof (err as { message?: unknown }).message === 'string') {
+      return (err as { message: string }).message;
+    }
+    return fallback;
   };
 
   const register = async (data: AuthFormData) => {
@@ -30,7 +74,8 @@ export const useAuth = () => {
       localStorage.setItem(TOKEN_KEY, response.token);
       setToken(response.token);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Registration failed');
+      const message = getErrorMessage(err, 'Registration failed');
+      showError(message, 'Registration Failed');
       throw err;
     } finally {
       setLoading(false);
@@ -46,7 +91,8 @@ export const useAuth = () => {
       setToken(response.token);
     } catch (err) {
       console.error('Login error:', err);
-      alert(err instanceof Error ? err.message : 'Login failed');
+      const message = getErrorMessage(err, 'Login failed');
+      showError(message, 'Login Failed');
       throw err;
     } finally {
       setLoading(false);
@@ -64,5 +110,5 @@ export const useAuth = () => {
     setUser(null);
   };
 
-  return { token, user, loading, register, login, logout };
+  return { token, user, loading: loading || profileLoading, register, login, logout };
 };

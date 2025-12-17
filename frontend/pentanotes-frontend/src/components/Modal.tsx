@@ -59,14 +59,19 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   const handleConfirm = async () => {
-    if (onConfirm) {
-      if (type === 'prompt') {
-        await onConfirm(inputValue);
-      } else {
-        await onConfirm();
+    try {
+      if (onConfirm) {
+        if (type === 'prompt') {
+          await onConfirm(inputValue);
+        } else {
+          await onConfirm();
+        }
       }
+      onClose();
+    } catch (err) {
+      // Keep modal open if confirm handler throws; handler can show its own modal
+      console.error('Modal confirm handler failed:', err);
     }
-    onClose();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -163,4 +168,5 @@ export const Modal: React.FC<ModalProps> = ({
     </div>
   );
 };
+
 

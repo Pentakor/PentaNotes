@@ -1,5 +1,5 @@
 import { API_URL, TOKEN_KEY } from '../config/constants';
-import { Note, User, AuthFormData, LoginCredentials, Folder } from '../types';
+import { Note, User, AuthFormData, LoginCredentials, Folder, Tag } from '../types';
 
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
@@ -86,6 +86,19 @@ class ApiService {
     return response.data?.notes || response.data || response;
   }
 
+  async getNoteById(id: number): Promise<Note> {
+    const res = await fetch(`${API_URL}/notes/${id}/`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch note');
+    }
+
+    const response = await res.json();
+    return response.data?.note || response.data || response;
+  }
+
   async getNotesByFolder(folderId: number): Promise<Note[]> {
     const res = await fetch(`${API_URL}/folders/${folderId}/notes`, {
       headers: this.getHeaders(true),
@@ -101,7 +114,8 @@ class ApiService {
 
   async createNote(title: string, content: string, folderId?: number | null): Promise<Note> {
     const payload: Record<string, unknown> = { title, content };
-    if (folderId !== undefined && folderId !== null) {
+    // Don't include folderId if undefined - backend defaults to null
+    if (folderId !== undefined) {
       payload.folderId = folderId;
     }
 
@@ -110,19 +124,29 @@ class ApiService {
       headers: this.getHeaders(true),
       body: JSON.stringify(payload),
     });
-    
+
     if (!res.ok) {
-      throw new Error('Failed to create note');
+      let errorMessage = 'Failed to create note';
+      try {
+        const errorBody = await res.json();
+        if (errorBody?.message) {
+          errorMessage = errorBody.message;
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse create note error response:', parseErr);
+      }
+      throw new Error(errorMessage);
     }
-    
+
     const response = await res.json();
     console.log('Create note response:', response);
     // FIXED: Extract note from nested structure data.note
     return response.data?.note || response.data || response;
   }
 
-  async updateNote(id: number, title: string, content: string, folderId?: number | null): Promise<Note> {
+  async updateNote(id: number, title: string, content: string, folderId?: number | null | 'ALL Notes'): Promise<Note> {
     const payload: Record<string, unknown> = { title, content };
+    // Include folderId if it's explicitly passed (including null or "ALL Notes" to remove from folder)
     if (folderId !== undefined) {
       payload.folderId = folderId;
     }
@@ -154,7 +178,7 @@ class ApiService {
   }
 
   async getFolders(): Promise<Folder[]> {
-    const res = await fetch(`${API_URL}/folders`, {
+    const res = await fetch(`${API_URL}/folders/`, {
       headers: this.getHeaders(true),
     });
 
@@ -163,23 +187,46 @@ class ApiService {
     }
 
     const response = await res.json();
-    return (
+    const payload =
       response.data?.folders ||
+      response.folders ||
       response.data?.notes || // backend currently returns data.notes
       response.data ||
-      response
-    );
+      response;
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (payload?.folders && Array.isArray(payload.folders)) {
+      return payload.folders;
+    }
+
+    if (payload?.notes && Array.isArray(payload.notes)) {
+      return payload.notes;
+    }
+
+    return [];
   }
 
   async createFolder(title: string): Promise<Folder> {
-    const res = await fetch(`${API_URL}/folders`, {
+    const res = await fetch(`${API_URL}/folders/`, {
       method: 'POST',
       headers: this.getHeaders(true),
       body: JSON.stringify({ title }),
     });
 
     if (!res.ok) {
-      throw new Error('Failed to create folder');
+      let errorMessage = 'Failed to create folder';
+      try {
+        const errorBody = await res.json();
+        if (errorBody?.message) {
+          errorMessage = errorBody.message;
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse create folder error response:', parseErr);
+      }
+      throw new Error(errorMessage);
     }
 
     const response = await res.json();
@@ -210,6 +257,93 @@ class ApiService {
     if (!res.ok) {
       throw new Error('Failed to delete folder');
     }
+  }
+
+  async getTags(): Promise<Tag[]> {
+    const res = await fetch(`${API_URL}/tags/`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch tags');
+    }
+
+    const response = await res.json();
+    const payload = response.data?.tags || response.tags || response.data || response;
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (payload?.tags && Array.isArray(payload.tags)) {
+      return payload.tags;
+    }
+
+    return [];
+  }
+
+  async getNotesByTag(tagId: number): Promise<Note[]> {
+    const res = await fetch(`${API_URL}/tags/${tagId}/notes`, {
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch notes for tag');
+    }
+
+    const response = await res.json();
+    return response.data?.notes || response.notes || response.data || response;
+  }
+
+  async sendMcpMessage(message: string, userId: number): Promise<{ status: string; message: string; data: string; changed?: string[]; requestId?: string }> {
+  const res = await fetch('http://localhost:8080/mcp', {
+    method: 'POST',
+    headers: this.getHeaders(true), // This includes the Bearer token
+    body: JSON.stringify({ message, userId }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to send message to MCP server');
+  }
+
+  const response = await res.json();
+  return response;
+}
+
+  async revertAiRequest(requestId: string, userId: number): Promise<{ status: string; message: string; data: { operationsReverted: number; message: string } }> {
+    const res = await fetch('http://localhost:8080/mcp/revert', {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ requestId, userId }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error || error.message || 'Failed to revert request');
+    }
+
+    const response = await res.json();
+    
+    // Validate response structure
+    if (!response.data || typeof response.data.operationsReverted !== 'number') {
+      throw new Error('Invalid revert response format');
+    }
+    
+    return response;
+  }
+
+  async getRequestStatus(requestId: string, userId: number): Promise<{ status: string; message: string; data: { status: string; message: string; actionCount?: number; revertedAt?: string } }> {
+    const res = await fetch(`http://localhost:8080/mcp/status/${requestId}?userId=${userId}`, {
+      method: 'GET',
+      headers: this.getHeaders(true),
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch request status');
+    }
+
+    const response = await res.json();
+    return response;
   }
 }
 

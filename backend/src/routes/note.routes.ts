@@ -5,6 +5,7 @@ import {
   getNoteById,
   updateNote,
   deleteNote,
+  getNoteNames,
 } from '../controllers/note.controller';
 import { validate } from '../middleware/validation';
 import {
@@ -21,6 +22,7 @@ const router = Router();
 router.use(authenticate);
 
 router.post('/', validate(createNoteSchema), createNote);
+router.get('/names', getNoteNames);
 router.get('/', getNotes);
 router.get('/:id', validate(getNoteSchema), getNoteById);
 router.put('/:id', validate(updateNoteSchema), updateNote);

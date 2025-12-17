@@ -48,6 +48,11 @@ Folder.init(
 
     indexes: [
       { fields: ['userId'] },
+      {
+        unique: true,
+        fields: ['userId', 'title'],
+        name: 'unique_user_folder_title',
+      },
     ],
   }
 );

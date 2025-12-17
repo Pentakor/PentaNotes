@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useNotes } from './hooks/useNotes';
 import { useFolders } from './hooks/useFolders';
+import { useTags } from './hooks/useTags';
 import { LoginPage } from './components/LoginPage';
 import { Sidebar } from './components/Sidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { Note } from './types';
 import { Modal, ModalType } from './components/Modal';
+import { ChatBot } from './components/ChatBot';
 
 type AppModal = {
   isOpen: boolean;
@@ -22,11 +24,24 @@ type AppModal = {
 const App = () => {
   const { token, user, loading: authLoading, register, login, logout } = useAuth();
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
-  const { notes, loading: notesLoading, createNote, updateNote, deleteNote } = useNotes(token, selectedFolderId);
-  const { folders, createFolder, updateFolder, deleteFolder } = useFolders(token);
+  const [selectedTagId, setSelectedTagId] = useState<number | null>(null);
+  const { folders, createFolder, updateFolder, deleteFolder, refreshFolders } = useFolders(token);
+  const { tags, loading: tagsLoading, refreshTags } = useTags(token);
+
+  const selectedTagName = useMemo(() => {
+    if (selectedTagId === null) {
+      return null;
+    }
+    return tags.find((tag) => tag.id === selectedTagId)?.name ?? null;
+  }, [selectedTagId, tags]);
+
+  const { notes, allNotes, loading: notesLoading, createNote, updateNote, deleteNote, refreshNotes } = useNotes(
+    token,
+    selectedFolderId,
+    selectedTagName
+  );
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
   const [modal, setModal] = useState<AppModal>({
     isOpen: false,
     type: 'alert',
@@ -58,19 +73,71 @@ const App = () => {
           // Just set it - the newNote already has the correct title from the API
           setSelectedNote(newNote);
         } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to create note';
           showModal({
             type: 'error',
             title: 'Error',
-            message: 'Failed to create note',
+            message: errorMessage,
           });
+          // Re-throw so the modal stays open on failure
+          throw err;
         }
       },
     });
   };
 
+  useEffect(() => {
+    if (!token) {
+      setSelectedTagId(null);
+      return;
+    }
+    if (selectedTagId !== null && !tags.some((tag) => tag.id === selectedTagId)) {
+      setSelectedTagId(null);
+    }
+  }, [selectedTagId, tags, token]);
+
+  // Check if selected note still exists in the allNotes list
+  // This handles cases where a note was deleted (e.g., via AI revert)
+  useEffect(() => {
+    if (selectedNote && !allNotes.some((note) => note.id === selectedNote.id)) {
+      setSelectedNote(null);
+    }
+  }, [allNotes, selectedNote]);
+
   const handleFolderSelect = (folderId: number | null) => {
     setSelectedFolderId(folderId);
+    setSelectedTagId(null);
     setSelectedNote(null);
+  };
+
+  const handleTagSelect = (tagId: number | null) => {
+    setSelectedTagId(tagId);
+    if (tagId !== null) {
+      setSelectedFolderId(null);
+    }
+    setSelectedNote(null);
+  };
+
+  const normalizeTagName = (value: string) => value.replace(/^#/, '').trim().toLowerCase();
+
+  const handleTagFocus = async (tagName: string) => {
+    const normalized = normalizeTagName(tagName);
+    if (!normalized) {
+      return;
+    }
+    const findTagByName = (collection: typeof tags) =>
+      collection.find((tag) => tag.name.toLowerCase() === normalized);
+
+    let targetTag = findTagByName(tags);
+    if (!targetTag) {
+      const refreshed = await refreshTags();
+      targetTag = findTagByName(refreshed);
+    }
+    if (targetTag) {
+      setSelectedTagId(targetTag.id);
+      setSelectedFolderId(null);
+    }
   };
 
   const handleCreateFolder = () => {
@@ -86,15 +153,30 @@ const App = () => {
         if (!folderTitle) {
           return;
         }
+        // Prevent creating folders with reserved name
+        if (folderTitle === 'ALL Notes') {
+          showModal({
+            type: 'error',
+            title: 'Invalid Folder Name',
+            message: '"ALL Notes" is a reserved folder name and cannot be used',
+          });
+          throw new Error('"ALL Notes" is a reserved folder name');
+        }
         try {
           const folder = await createFolder(folderTitle);
           setSelectedFolderId(folder.id);
+          setSelectedTagId(null);
+          setSelectedNote(null);
         } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to create folder';
           showModal({
             type: 'error',
             title: 'Error',
-            message: 'Failed to create folder',
+            message: errorMessage,
           });
+          // Re-throw so the modal stays open on failure
+          throw err;
         }
       },
     });
@@ -113,6 +195,15 @@ const App = () => {
         const folderTitle = value?.trim();
         if (!folderTitle || folderTitle === folder?.title) {
           return;
+        }
+        // Prevent renaming to reserved name
+        if (folderTitle === 'ALL Notes') {
+          showModal({
+            type: 'error',
+            title: 'Invalid Folder Name',
+            message: '"ALL Notes" is a reserved folder name and cannot be used',
+          });
+          throw new Error('"ALL Notes" is a reserved folder name');
         }
         try {
           await updateFolder(folderId, { title: folderTitle });
@@ -165,6 +256,8 @@ const App = () => {
           if (selectedNote?.id === id) {
             setSelectedNote(null);
           }
+          await refreshTags();
+          await refreshNotes();
         } catch (err) {
           showModal({
             type: 'error',
@@ -180,7 +273,7 @@ const App = () => {
     id: number,
     title: string,
     content: string,
-    folderId?: number | null
+    folderId?: number | null | 'ALL Notes'
   ) => {
     try {
       const updatedNote = await updateNote(id, title, content, folderId);
@@ -190,6 +283,7 @@ const App = () => {
       } else {
         setSelectedNote(updatedNote);
       }
+      await refreshTags();
       return updatedNote;
     } catch (err) {
       showModal({
@@ -201,8 +295,71 @@ const App = () => {
     }
   };
 
+  // Find or create a note by title
+  const findOrCreateNoteByTitle = async (noteTitle: string): Promise<Note> => {
+    try {
+      // Get all notes to search for existing one
+      const existingNote = allNotes.find((n) => n.title.toLowerCase() === noteTitle.toLowerCase());
+      
+      if (existingNote) {
+        return existingNote;
+      }
+      
+      // Create new note if it doesn't exist
+      return await createNote(noteTitle, null);
+    } catch (err) {
+      console.error('Failed to find or create note:', err);
+      throw err;
+    }
+  };
+
+  // Handle link click - save current note and navigate to linked note
+  const handleLinkClick = async (
+    linkName: string,
+    noteId: number,
+    title: string,
+    content: string,
+    folderId: number | null | 'ALL Notes'
+  ) => {
+    try {
+      // First, save the current note with its current state
+      await handleUpdateNote(noteId, title, content, folderId);
+      
+      // Find or create the linked note
+      const targetNote = await findOrCreateNoteByTitle(linkName);
+      
+      // Open the target note
+      setSelectedNote(targetNote);
+    } catch (err) {
+      showModal({
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to open linked note',
+      });
+    }
+  };
+
+  // Show login page if no token or no user (invalid token)
+  // But wait if we're still loading the profile
   if (!token) {
     return <LoginPage onLogin={login} onRegister={register} loading={authLoading} />;
+  }
+
+  // If we have a token but no user and we're done loading, token is invalid
+  if (token && !user && !authLoading) {
+    return <LoginPage onLogin={login} onRegister={register} loading={false} />;
+  }
+
+  // If we're still loading the profile, show a loading state
+  if (token && !user && authLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -212,12 +369,16 @@ const App = () => {
         notes={notes}
         notesLoading={notesLoading}
         folders={folders}
+        tags={tags}
         selectedFolderId={selectedFolderId}
+        selectedTagId={selectedTagId}
         selectedNote={selectedNote}
+        tagsLoading={tagsLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNoteSelect={setSelectedNote}
         onFolderSelect={handleFolderSelect}
+        onTagSelect={handleTagSelect}
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
         onDeleteFolder={handleDeleteFolder}
@@ -229,6 +390,9 @@ const App = () => {
         folders={folders}
         onUpdate={handleUpdateNote}
         onDelete={handleDeleteNote}
+        onLinkClick={handleLinkClick}
+        onTagClick={handleTagFocus}
+        allNotes={allNotes}
       />
 
       {/* Global Modal */}
@@ -243,6 +407,22 @@ const App = () => {
         onClose={closeModal}
         onConfirm={modal.onConfirm}
       />
+
+      {/* ChatBot - only shows when user is logged in */}
+      {user && (
+        <ChatBot
+          user={user}
+          onNotesChanged={refreshNotes}
+          onFoldersChanged={refreshFolders}
+          selectedNoteId={selectedNote?.id}
+          onSelectedNoteUpdated={(updatedNote) => {
+            // Update the selected note when AI makes changes to it
+            if (selectedNote && updatedNote.id === selectedNote.id) {
+              setSelectedNote(updatedNote);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

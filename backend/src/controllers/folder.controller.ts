@@ -1,20 +1,41 @@
 import { Request, Response } from 'express';
-import { Folder } from '../models';
+import {
+  createFolderService,
+  deleteFolderService,
+  getFolderByIdService,
+  getFoldersService,
+  updateFolderService,
+} from '../services/folder.service';
 
 export const createFolder = async (req: Request, res: Response): Promise<void> => {
   try {
     const { title } = req.body;
     const userId = req.user?.id;
 
-    const folder = await Folder.create({
-      userId: userId!,
-      title
-    });
+    const result = await createFolderService(userId!, title);
+
+    // Handle reserved title error
+    if (result.error === 'RESERVED_TITLE') {
+      res.status(400).json({
+        success: false,
+        message: '"ALL Notes" is a reserved folder name and cannot be used',
+      });
+      return;
+    }
+
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A folder with this title already exists',
+      });
+      return;
+    }
 
     res.status(201).json({
       success: true,
       message: 'Folder created successfully',
-      data: { folder },
+      data: { folder: result.folder },
     });
   } catch (error) {
     console.error('Create folder error:', error);
@@ -29,14 +50,11 @@ export const getFolders = async (req: Request, res: Response): Promise<void> => 
   try {
     const userId = req.user?.id;
 
-    const notes = await Folder.findAll({
-      where: { userId },
-      order: [['updatedAt', 'DESC']],
-    });
+    const folders = await getFoldersService(userId!);
 
     res.status(200).json({
       success: true,
-      data: { notes },
+      data: { folders },
     });
   } catch (error) {
     console.error('Get folders error:', error);
@@ -52,9 +70,7 @@ export const getFolderById = async (req: Request, res: Response): Promise<void> 
     const { id } = req.params;
     const userId = req.user?.id;
 
-    const folder = await Folder.findOne({
-      where: { id: parseInt(id), userId },
-    });
+    const folder = await getFolderByIdService(userId!, parseInt(id));
 
     if (!folder) {
       res.status(404).json({
@@ -72,7 +88,7 @@ export const getFolderById = async (req: Request, res: Response): Promise<void> 
     console.error('Get folder error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching note',
+      message: 'Error fetching tag',
     });
   }
 };
@@ -83,11 +99,9 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
     const { title, content } = req.body;
     const userId = req.user?.id;
 
-    const folder = await Folder.findOne({
-      where: { id: parseInt(id), userId },
-    });
+    const result = await updateFolderService(userId!, parseInt(id), { title });
 
-    if (!folder) {
+    if (!result) {
       res.status(404).json({
         success: false,
         message: 'Folder not found',
@@ -95,15 +109,28 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Update only provided fields
-    if (title !== undefined) folder.title = title;
+    // Handle reserved title error
+    if (result.error === 'RESERVED_TITLE') {
+      res.status(400).json({
+        success: false,
+        message: '"ALL Notes" is a reserved folder name and cannot be used',
+      });
+      return;
+    }
 
-    await folder.save();
+    // Handle duplicate title error
+    if (result.error === 'DUPLICATE_TITLE') {
+      res.status(409).json({
+        success: false,
+        message: 'A folder with this title already exists',
+      });
+      return;
+    }
 
     res.status(200).json({
       success: true,
       message: 'Folder updated successfully',
-      data: { folder },
+      data: { folder: result.folder },
     });
   } catch (error) {
     console.error('Update folder error:', error);
@@ -116,32 +143,26 @@ export const updateFolder = async (req: Request, res: Response): Promise<void> =
 
 export const deleteFolder = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const folderId = parseInt(req.params.id);
     const userId = req.user?.id;
 
-    const folder = await Folder.findOne({
-      where: { id: parseInt(id), userId },
-    });
-
-    if (!folder) {
-      res.status(404).json({
-        success: false,
-        message: 'Folder not found',
-      });
+    if (isNaN(folderId)) {
+      res.status(400).json({ success: false, message: 'Invalid folder ID' });
       return;
     }
 
-    await folder.destroy();
+    const deleted = await deleteFolderService(userId!, folderId);
+    if (!deleted) {
+      res.status(404).json({ success: false, message: 'Folder not found' });
+      return;
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Folder deleted successfully',
+      message: 'Folder and all related notes deleted successfully',
     });
   } catch (error) {
     console.error('Delete folder error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting folder',
-    });
+    res.status(500).json({ success: false, message: 'Error deleting folder' });
   }
 };
