@@ -66,7 +66,7 @@ and your name.
 
 ## Key Features
 
-### MCP AI Assistant
+### AI Assistant
 - **Natural Language Processing**: Understands commands like "Create a note about project X in folder Y"
 - **Tool Use**: Automatically executes backend operations (create/update/delete notes, folders, tags)
 - **RAG (Context Awareness)**: Fetches user's existing notes, folders, and tags for smarter decisions
